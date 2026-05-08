@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Book Library - Book to Audiobook{% endblock %}
+{% block content %}
+<div class="library-page">
+    <div class="library-header">
+        <h1>Book Library</h1>
+    </div>
+
+    <div class="upload-zone" id="dropZone">
+        <div class="upload-icon">&#x1F4E5;</div>
+        <p>Drag & drop ebook here, or click to select</p>
+        <p class="hint">Supported: {{ supported_formats | join(', ') | upper }}</p>
+        <input type="file" id="fileInput" accept=".epub,.mobi,.azw3,.pdf,.txt" hidden>
+    </div>
+    <div id="uploadStatus" class="status-msg hidden"></div>
+
+    {% if books %}
+    <div class="books-grid">
+        {% for book in books %}
+        <a href="/books/{{ book.id }}" class="book-card">
+            <div class="book-card-title">{{ book.title }}</div>
+            <div class="book-card-author">{{ book.author }}</div>
+            <div class="book-card-meta">
+                <span class="tag">{{ book.format.value | upper }}</span>
+                <span>{{ book.chapters | length }} chapters</span>
+                {% if book.conversions %}
+                <span class="tag tag-green">{{ book.conversions | length }} converted</span>
+                {% endif %}
+            </div>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <p>No books yet. Upload one above to get started.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/app.js"></script>
+<script>
+initUpload();
+</script>
+{% endblock %}

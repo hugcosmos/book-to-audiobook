@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block title %}{{ book.title }} - Book Detail{% endblock %}
+{% block content %}
+<div class="detail-page">
+    <a href="/" class="back-link">&larr; Back to Library</a>
+    <div class="book-info">
+        <h1>{{ book.title }}</h1>
+        <p class="author">{{ book.author }} &middot; {{ book.format.value | upper }} &middot; {{ book.chapters | length }} chapters</p>
+    </div>
+
+    <div class="detail-layout">
+        <!-- Left: Chapter list -->
+        <div class="chapters-list">
+            <div class="chapters-header">
+                <h2>Chapters</h2>
+                <div class="select-actions">
+                    <button onclick="toggleAll(true)">All</button>
+                    <button onclick="toggleAll(false)">None</button>
+                </div>
+            </div>
+            <ul class="chapter-list" id="chapterList">
+                {% for ch in book.chapters %}
+                <li class="chapter-item" data-index="{{ ch.index }}">
+                    <label>
+                        <input type="checkbox" name="chapters" value="{{ ch.index }}" checked>
+                        <span class="ch-title">{{ ch.title }}</span>
+                        <span class="ch-meta">{{ ch.char_count }} chars &middot; ~{{ "%.0f" | format(ch.estimated_duration_seconds / 60) }} min</span>
+                    </label>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Right: Settings + History -->
+        <div class="right-panel">
+            <div class="settings-panel">
+                <h2>TTS Settings</h2>
+                <div class="form-group">
+                    <label>Language</label>
+                    <select id="language" onchange="updateVoices()">
+                        <option value="zh-CN">Chinese (Mandarin)</option>
+                        <option value="en-US">English (US)</option>
+                        <option value="en-GB">English (UK)</option>
+                        <option value="ja-JP">Japanese</option>
+                        <option value="ko-KR">Korean</option>
+                        <option value="fr-FR">French</option>
+                        <option value="de-DE">German</option>
+                        <option value="es-ES">Spanish</option>
+                        <option value="ru-RU">Russian</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Voice</label>
+                    <select id="voice"></select>
+                </div>
+                <div class="form-group">
+                    <label>Speed: <span id="rateVal">0%</span></label>
+                    <input type="range" id="rate" min="-50" max="100" value="0" step="10" oninput="document.getElementById('rateVal').textContent=this.value+'%'">
+                </div>
+                <div class="form-group">
+                    <label>Output Format</label>
+                    <label class="checkbox-label"><input type="checkbox" id="outM4b" checked> M4B (with chapters)</label>
+                    <label class="checkbox-label"><input type="checkbox" id="outMp3" checked> MP3 (combined)</label>
+                </div>
+                <button class="btn btn-primary btn-block" id="convertBtn" onclick="startConvert('{{ book.id }}')">&#9654; Start Conversion</button>
+            </div>
+
+            <!-- Inline progress -->
+            <div class="progress-inline hidden" id="progressSection">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                </div>
+                <div class="progress-info">
+                    <span id="progressText">0%</span>
+                    <span id="currentChapter"></span>
+                    <button class="btn btn-sm btn-danger" id="cancelBtn" onclick="cancelConvert('{{ book.id }}')">Cancel</button>
+                </div>
+                <p id="errorMsg" class="error-msg hidden"></p>
+            </div>
+
+            <!-- Conversion History -->
+            {% if book.conversions %}
+            <div class="history-panel">
+                <h2>Conversion History</h2>
+                {% for conv in book.conversions %}
+                <div class="history-item">
+                    <div class="history-time">{{ conv.timestamp[:19] | replace('T', ' ') }}</div>
+                    <div class="history-files">
+                        {% for f in conv.output_files %}
+                        {% if f.type != 'chapter' %}
+                        <a class="btn btn-sm" href="/download/{{ book.id }}/file/{{ f.filename }}">&#11015; {{ f.filename }}</a>
+                        {% endif %}
+                        {% endfor %}
+                        <details class="chapter-dl-details">
+                            <summary>Per-chapter files ({{ conv.output_files | selectattr('type', 'eq', 'chapter') | list | length }})</summary>
+                            <div class="chapter-dl-list">
+                                {% for f in conv.output_files %}
+                                {% if f.type == 'chapter' %}
+                                <a href="/download/{{ book.id }}/file/{{ f.filename }}">{{ f.title }}</a>
+                                {% endif %}
+                                {% endfor %}
+                            </div>
+                        </details>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="/static/js/app.js"></script>
+<script>
+var bookId = '{{ book.id }}';
+var voiceData = {
+    "zh-CN": ["zh-CN-XiaoxiaoNeural", "zh-CN-YunxiNeural", "zh-CN-YunjianNeural", "zh-CN-XiaoyiNeural"],
+    "en-US": ["en-US-GuyNeural", "en-US-JennyNeural", "en-US-AriaNeural", "en-US-DavisNeural"],
+    "en-GB": ["en-GB-RyanNeural", "en-GB-SoniaNeural"],
+    "ja-JP": ["ja-JP-NanamiNeural", "ja-JP-KeitaNeural"],
+    "ko-KR": ["ko-KR-SunHiNeural", "ko-KR-InJoonNeural"],
+    "fr-FR": ["fr-FR-HenriNeural", "fr-FR-DeniseNeural"],
+    "de-DE": ["de-DE-ConradNeural", "de-DE-KatjaNeural"],
+    "es-ES": ["es-ES-AlvaroNeural", "es-ES-ElviraNeural"],
+    "ru-RU": ["ru-RU-DmitryNeural", "ru-RU-SvetlanaNeural"]
+};
+updateVoices();
+</script>
+{% endblock %}
