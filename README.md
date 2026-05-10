@@ -144,11 +144,18 @@ CLI and Web app share the same configuration and output directory:
 
 ### Workflow
 
+#### Web Interface
 1. **Upload** — Drag & drop an ebook on the library page
 2. **Select chapters** — Click the book card, pick chapters to convert
 3. **Configure TTS** — Choose provider, language, voice, speed
 4. **Convert** — Progress shows inline, no page navigation
 5. **Download** — Files appear in Generated Files after completion
+
+#### Command Line
+1. **Preview** — `book2audio chapters /path/to/book.pdf`
+2. **Configure** — `book2audio config set tts.provider edge-tts` (optional)
+3. **Convert** — `book2audio convert /path/to/book.pdf -c 1-10`
+4. **Locate** — Output files saved to `output/` directory
 
 Conversions are saved — restart the server and all books/history remain unless you delete them.
 
@@ -235,6 +242,8 @@ app/               # FastAPI web app
   routes/          # HTTP routes
   templates/       # Jinja2 HTML templates
   static/          # CSS + JS
+cli/               # Command Line Interface
+  main.py          # CLI entry point with click commands
 core/              # Core logic
   converter.py     # Conversion orchestrator + state persistence
   models.py        # Pydantic data models
