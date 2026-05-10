@@ -51,6 +51,7 @@ class TTSConfig(BaseModel):
     voice: str = "vivian"
     language: str = "zh-CN"
     speed: float = 1.0
+    model_path: str | None = None
 
 
 class ConversionRequest(BaseModel):

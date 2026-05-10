@@ -37,10 +37,13 @@ class Qwen3MLXTTSProvider(BaseTTSProvider):
     _request_queue: queue.Queue | None = None
     _worker_ready = threading.Event()
     _worker_started = False
+    _model_path: str | None = None
 
     def __init__(self, config: TTSConfig) -> None:
         super().__init__(config)
         self.max_retries = settings.tts.max_retries
+        if config.model_path:
+            Qwen3MLXTTSProvider._model_path = config.model_path
         self._ensure_worker()
 
     # ------------------------------------------------------------------
@@ -89,7 +92,7 @@ class Qwen3MLXTTSProvider(BaseTTSProvider):
 
         from mlx_audio.tts.utils import load_model
 
-        model_name = settings.qwen3_mlx.model_name
+        model_name = cls._model_path or settings.qwen3_mlx.model_path or settings.qwen3_mlx.model_name
         cls._model = load_model(model_name)
         log.info("Qwen3 TTS MLX model loaded in worker thread: %s", model_name)
         cls._worker_ready.set()

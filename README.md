@@ -11,11 +11,17 @@ Convert ebooks (EPUB, MOBI, AZW3, PDF, TXT) to audiobooks (M4B / MP3) with chapt
 ## Install
 
 ```bash
-git clone https://github.com/hugcosmos/book-to-audiobook.git && cd book-to-audiobook
+# Clone the repository
+git clone https://github.com/hugcosmos/book-to-audiobook.git
+cd book-to-audiobook
+
+# Install dependencies and the CLI tool
 pip install -e .
 ```
 
 ## Usage
+
+### Web Interface
 
 ```bash
 # Start server
@@ -29,6 +35,112 @@ python -m app.main
 ```
 
 Open http://localhost:8000 in your browser.
+
+### Command Line Interface (CLI)
+
+After installation, the `book2audio` command is available system-wide:
+
+```bash
+# Verify installation
+book2audio --help
+```
+
+#### CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `convert` | Convert ebook to audiobook |
+| `chapters` | Preview book chapters (shows char count and estimated time) |
+| `voice` | Manage voices (list/add/delete) |
+| `config` | Manage configuration (show/get/set/reset) |
+| `library` | Manage audiobook library (list books) |
+| `serve` | Start web server |
+
+#### Convert Options
+
+| Option | Description |
+|--------|-------------|
+| `-c, --chapters` | Chapter range (e.g., `1-5,7,10-` for chapters 1-5, 7, 10+) |
+| `-p, --provider` | TTS provider: `edge-tts`, `elevenlabs`, `baidu-tts`, `iflytek-tts`, `qwen3_mlx` |
+| `-v, --voice` | Voice name |
+| `-l, --language` | Language code (zh-CN, en-US, ja-JP, etc.) |
+| `-s, --speed` | Speech speed (0.5-2.0) |
+| `--model-path` | Local model path (for qwen3_mlx provider) |
+| `--book-id` | Add output to existing library book (shares directory with web app) |
+
+#### CLI Examples
+
+```bash
+# Convert entire book with default settings
+book2audio convert /path/to/book.pdf
+
+# Convert specific chapters
+book2audio convert book.epub -c 1-10
+
+# Use specific provider and voice
+book2audio convert book.pdf -p edge-tts -v zh-CN-XiaoyiNeural -s 1.2
+
+# Use local qwen3_mlx model (avoid repeated downloads)
+book2audio convert book.epub -p qwen3_mlx --model-path ~/.cache/huggingface/hub/models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit
+
+# Add to existing library book (shares output with web app, preserves cover)
+book2audio convert new_chapters.pdf --book-id a74e947e332e -c 11-20
+
+# Preview chapters (shows char count and estimated conversion time)
+book2audio chapters my_book.pdf
+
+# List available voices
+book2audio voice list
+
+# Add custom voice
+book2audio voice add --provider elevenlabs --voice-id "xxx" --name "My Voice" --language en-US
+
+# Configure settings
+book2audio config show
+book2audio config set tts.provider edge-tts
+book2audio config set qwen3_mlx.model_path "/path/to/local/model"
+
+# List library books (to get book_id)
+book2audio library list
+
+# Start web server
+book2audio serve
+```
+
+#### CLI Quick Start Example
+
+```bash
+# 1. Clone and install
+git clone https://github.com/hugcosmos/book-to-audiobook.git
+cd book-to-audiobook
+pip install -e .
+
+# 2. Check available voices
+book2audio voice list
+
+# 3. Configure default provider (optional)
+book2audio config set tts.provider edge-tts
+
+# 4. Set local model path to avoid repeated downloads (qwen3_mlx users)
+book2audio config set qwen3_mlx.model_path "~/.cache/huggingface/hub/models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
+
+# 5. Preview book chapters
+book2audio chapters my_book.pdf
+
+# 6. Convert to audiobook
+book2audio convert my_book.pdf --chapters 1-10 --speed 1.2
+
+# 7. Find output files
+# Output saved to: output/my_book/audiobook.m4b and audiobook.mp3
+```
+
+#### CLI and Web App Integration
+
+CLI and Web app share the same configuration and output directory:
+- Configuration: `config/user_settings.json`
+- Output directory: `output/`
+- Use `--book-id` flag to add CLI conversions to existing web app books
+- CLI conversions inherit book metadata (title, author, cover) when using `--book-id`
 
 ### Workflow
 

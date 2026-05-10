@@ -15,13 +15,16 @@ _PROVIDER_MAP: dict[str, tuple[str, str]] = {
 }
 
 
-def get_tts_provider(config: TTSConfig | None = None, provider: str | None = None) -> BaseTTSProvider:
-    config = config or TTSConfig()
+def get_tts_provider(provider: str | None = None, model_path: str | None = None, config: TTSConfig | None = None) -> BaseTTSProvider:
+    if config is None:
+        config = TTSConfig()
     name = provider or settings.tts.provider
     if name not in _PROVIDER_MAP:
         raise ValueError(
             f"Unknown TTS provider: {name}. Available: {list(_PROVIDER_MAP)}"
         )
+    if model_path:
+        config.model_path = model_path
     module_path, class_name = _PROVIDER_MAP[name]
     module = import_module(module_path)
     cls = getattr(module, class_name)

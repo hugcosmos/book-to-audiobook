@@ -115,7 +115,7 @@ class Converter:
         try:
             book = self._books[book_id]
             selected = [ch for ch in book.chapters if ch.index in request.selected_chapters]
-            tts = get_tts_provider(request.tts_config, request.tts_provider)
+            tts = get_tts_provider(provider=request.tts_provider, config=request.tts_config)
             audio_builder = AudioBuilder()
             out_dir = settings.output_dir / book_id
             out_dir.mkdir(parents=True, exist_ok=True)

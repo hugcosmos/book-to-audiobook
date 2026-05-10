@@ -20,11 +20,16 @@ dependencies = [
     "edge-tts>=6.1.0",
     "httpx>=0.27.0",
     "websockets>=12.0",
+    "click>=8.0",
+    "rich>=13.0",
 ]
+
+[project.scripts]
+book2audio = "cli.main:cli"
 
 [build-system]
 requires = ["setuptools>=68.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["app*", "core*", "config*", "utils*"]
+include = ["app*", "core*", "config*", "utils*", "cli*"]
