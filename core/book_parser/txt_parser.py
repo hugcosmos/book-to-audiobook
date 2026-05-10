@@ -6,6 +6,7 @@ from pathlib import Path
 from config.settings import settings
 from core.book_parser.base_parser import BaseBookParser
 from core.models import BookFormat, BookMetadata, Chapter
+from core.text_processor import TextProcessor
 from utils.log import log
 
 CHAPTER_PATTERN = re.compile(
@@ -55,7 +56,7 @@ class TxtParser(BaseBookParser):
                         title=title[:100],
                         text=text,
                         char_count=len(text),
-                        estimated_duration_seconds=len(text) / settings.chars_per_second,
+                        estimated_duration_seconds=TextProcessor.estimate_speech_duration(text),
                     )
                 )
             i += 2
@@ -79,7 +80,7 @@ class TxtParser(BaseBookParser):
                             title=f"Section {len(chapters) + 1}",
                             text=text,
                             char_count=len(text),
-                            estimated_duration_seconds=len(text) / settings.chars_per_second,
+                            estimated_duration_seconds=TextProcessor.estimate_speech_duration(text),
                         )
                     )
                 buffer = ""
@@ -91,7 +92,7 @@ class TxtParser(BaseBookParser):
                     title=f"Section {len(chapters) + 1}",
                     text=text,
                     char_count=len(text),
-                    estimated_duration_seconds=len(text) / settings.chars_per_second,
+                    estimated_duration_seconds=len(text) / settings.tts.chars_per_second,
                 )
             )
         return chapters

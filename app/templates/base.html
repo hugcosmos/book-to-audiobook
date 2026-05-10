@@ -3,16 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>{% block title %}Book to Audiobook{% endblock %}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=3">
 </head>
 <body>
+    <div id="reconnect-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;display:none;align-items:center;justify-content:center;">
+        <div style="background:#fff;padding:2rem 3rem;border-radius:12px;text-align:center;box-shadow:0 4px 24px rgba(0,0,0,0.2);">
+            <div style="font-size:1.5rem;margin-bottom:0.5rem;">&#x26A0;&#xFE0F;</div>
+            <div style="font-size:1.1rem;font-weight:600;margin-bottom:0.3rem;">Server restarting...</div>
+            <div style="color:#888;font-size:0.88rem;" id="reconnect-status">Reconnecting...</div>
+        </div>
+    </div>
     <nav class="navbar">
-        <a href="/" class="logo">&#x1F4DA; Book → Audiobook</a>
+        <div class="nav-left">
+            <a href="/" class="logo">&#x1F4DA; Book to Audiobook 🎧</a>
+        </div>
+        <div class="nav-right">
+            <a href="/settings" class="nav-link" title="TTS Settings">&#9881; TTS Settings</a>
+        </div>
     </nav>
     <main class="container">
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}
+    <script>
+    (function(){
+        var overlay = document.getElementById('reconnect-overlay');
+        var statusEl = document.getElementById('reconnect-status');
+        var timer = null;
+        function show(){ overlay.style.display = 'flex'; }
+        function hide(){ overlay.style.display = 'none'; if(timer){clearInterval(timer);timer=null;} }
+        function check(){
+            fetch('/api/settings').then(function(r){
+                if(r.ok){ hide(); window.location.reload(); }
+            }).catch(function(){});
+        }
+        var origFetch = window.fetch;
+        window.fetch = function(){
+            return origFetch.apply(this, arguments).catch(function(e){
+                show();
+                if(!timer) timer = setInterval(check, 2000);
+                throw e;
+            });
+        };
+    })();
+    </script>
 </body>
 </html>

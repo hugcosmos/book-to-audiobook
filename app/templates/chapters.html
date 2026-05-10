@@ -4,8 +4,13 @@
 <div class="detail-page">
     <a href="/" class="back-link">&larr; Back to Library</a>
     <div class="book-info">
-        <h1>{{ book.title }}</h1>
-        <p class="author">{{ book.author }} &middot; {{ book.format.value | upper }} &middot; {{ book.chapters | length }} chapters</p>
+        {% if book.cover_path %}
+        <img class="book-cover" src="/cover/{{ book.id }}" alt="Cover">
+        {% endif %}
+        <div class="book-info-text">
+            <h1 class="editable" id="bookTitle" onclick="editField(this, 'title')">{{ book.title }}</h1>
+            <p class="author editable" id="bookAuthor" onclick="editField(this, 'author')">{{ book.author }} &middot; {{ book.format.value | upper }} &middot; {{ book.chapters | length }} chapters</p>
+        </div>
     </div>
 
     <div class="detail-layout">
@@ -36,8 +41,14 @@
             <div class="settings-panel">
                 <h2>TTS Settings</h2>
                 <div class="form-group">
+                    <label>Provider</label>
+                    <select id="provider" onchange="onProviderChange()">
+                        <!-- populated by JS -->
+                    </select>
+                </div>
+                <div class="form-group">
                     <label>Language</label>
-                    <select id="language" onchange="updateVoices()">
+                    <select id="language" onchange="onLanguageChange()">
                         <option value="zh-CN">Chinese (Mandarin)</option>
                         <option value="en-US">English (US)</option>
                         <option value="en-GB">English (UK)</option>
@@ -52,10 +63,11 @@
                 <div class="form-group">
                     <label>Voice</label>
                     <select id="voice"></select>
+                    <button type="button" class="btn-preview" id="previewBtn" onclick="previewVoice()">&#9654; Preview Voice</button>
                 </div>
                 <div class="form-group">
-                    <label>Speed: <span id="rateVal">0%</span></label>
-                    <input type="range" id="rate" min="-50" max="100" value="0" step="10" oninput="document.getElementById('rateVal').textContent=this.value+'%'">
+                    <label>Speed: <span id="speedLabel">1.0x</span></label>
+                    <input type="range" id="speed" min="0.5" max="2.0" step="0.1" value="1.0" oninput="document.getElementById('speedLabel').textContent=this.value+'x'">
                 </div>
                 <div class="form-group">
                     <label>Output Format</label>
@@ -81,10 +93,13 @@
             <!-- Conversion History -->
             {% if book.conversions %}
             <div class="history-panel">
-                <h2>Conversion History</h2>
-                {% for conv in book.conversions %}
+                <h2>Generated Files</h2>
+                {% for conv in book.conversions|reverse %}
                 <div class="history-item">
-                    <div class="history-time">{{ conv.timestamp[:19] | replace('T', ' ') }}</div>
+                    <div class="history-header">
+                        <span class="history-time">{{ conv.timestamp[:19] | replace('T', ' ') }}</span>
+                        <button class="btn btn-sm btn-danger" onclick="deleteRecord('{{ book.id }}', '{{ conv.timestamp }}')">Delete</button>
+                    </div>
                     <div class="history-files">
                         {% for f in conv.output_files %}
                         {% if f.type != 'chapter' %}
@@ -111,20 +126,56 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/app.js"></script>
+<script src="/static/js/app.js?v=3"></script>
 <script>
 var bookId = '{{ book.id }}';
-var voiceData = {
-    "zh-CN": ["zh-CN-XiaoxiaoNeural", "zh-CN-YunxiNeural", "zh-CN-YunjianNeural", "zh-CN-XiaoyiNeural"],
-    "en-US": ["en-US-GuyNeural", "en-US-JennyNeural", "en-US-AriaNeural", "en-US-DavisNeural"],
-    "en-GB": ["en-GB-RyanNeural", "en-GB-SoniaNeural"],
-    "ja-JP": ["ja-JP-NanamiNeural", "ja-JP-KeitaNeural"],
-    "ko-KR": ["ko-KR-SunHiNeural", "ko-KR-InJoonNeural"],
-    "fr-FR": ["fr-FR-HenriNeural", "fr-FR-DeniseNeural"],
-    "de-DE": ["de-DE-ConradNeural", "de-DE-KatjaNeural"],
-    "es-ES": ["es-ES-AlvaroNeural", "es-ES-ElviraNeural"],
-    "ru-RU": ["ru-RU-DmitryNeural", "ru-RU-SvetlanaNeural"]
-};
-updateVoices();
+initTTSUI();
+
+function deleteRecord(bookId, timestamp) {
+    if (!confirm('Delete this conversion record and all its files?')) return;
+    fetch('/api/convert/' + bookId + '/record/' + encodeURIComponent(timestamp), {method: 'DELETE'})
+        .then(function(r) {
+            if (!r.ok) throw new Error('Delete failed');
+            location.reload();
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function editField(el, field) {
+    if (el.querySelector('input')) return;
+    var current = field === 'author'
+        ? el.textContent.split(' · ')[0].trim()
+        : el.textContent.trim();
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = current;
+    input.className = 'edit-input';
+    input.onblur = function() { saveField(field, input.value, el, current); };
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+        if (e.key === 'Escape') { el.textContent = current; }
+    };
+    el.textContent = '';
+    el.appendChild(input);
+    input.focus();
+}
+
+function saveField(field, value, el, original) {
+    var data = {};
+    data[field] = value;
+    fetch('/api/books/' + bookId, {
+        method: 'PUT',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    }).then(function(r) {
+        if (!r.ok) throw new Error('Save failed');
+        return r.json();
+    }).then(function(d) {
+        location.reload();
+    }).catch(function(e) {
+        alert('Error: ' + e.message);
+        el.textContent = original;
+    });
+}
 </script>
 {% endblock %}

@@ -7,6 +7,19 @@ from config.settings import settings
 
 class TextProcessor:
     @staticmethod
+    def estimate_speech_duration(text: str) -> float:
+        """Estimate speech duration, language-agnostic.
+        CJK chars: ~4 chars/sec. Latin words: ~2.5 words/sec (150 wpm).
+        Mixed text handled by counting each type separately.
+        """
+        if not text or not text.strip():
+            return 0.0
+        cjk_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff' or '\u3040' <= c <= '\u30ff' or '\uac00' <= c <= '\ud7af')
+        non_cjk = ''.join(c for c in text if not ('\u4e00' <= c <= '\u9fff' or '\u3040' <= c <= '\u30ff' or '\uac00' <= c <= '\ud7af'))
+        words = len(non_cjk.split())
+        return cjk_chars / 4.0 + words / 2.5
+
+    @staticmethod
     def clean(text: str, remove_endnotes: bool = True) -> str:
         text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
         text = re.sub(r"\s+", " ", text).strip()
@@ -17,7 +30,7 @@ class TextProcessor:
 
     @staticmethod
     def chunk(text: str, max_chars: int | None = None, language: str = "en") -> list[str]:
-        max_chars = max_chars or settings.tts_chunk_max_chars
+        max_chars = max_chars or settings.tts.chunk_max_chars
         if len(text) <= max_chars:
             return [text] if text.strip() else []
         chunks: list[str] = []

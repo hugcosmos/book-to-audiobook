@@ -33,6 +33,11 @@ async def upload_file(request: Request, file: UploadFile = File(...)):
     metadata.file_path = str(file_path)
     chapters = parser.get_chapters()
     metadata.chapters = chapters
+    # Extract cover image if supported
+    if hasattr(parser, "extract_cover"):
+        cover_path = parser.extract_cover(upload_dir)
+        if cover_path:
+            metadata.cover_path = cover_path
     converter = request.app.state.converter
     converter.add_book(metadata)
     return {"book_id": book_id, "title": metadata.title, "author": metadata.author, "chapter_count": len(chapters)}

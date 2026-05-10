@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="settings-page">
+    <a href="/" class="back-link">&larr; Back to Library</a>
+    <h1>TTS Settings</h1>
+    <p class="subtitle">Configure default provider, voices, and API keys. Changes take effect immediately.</p>
+
+    <form id="settingsForm" onsubmit="saveSettings(event)">
+        <!-- Default TTS -->
+        <div class="settings-card">
+            <div class="settings-card-header">
+                <div class="provider-icon icon-default">D</div>
+                <h2>Default TTS</h2>
+            </div>
+            <div class="settings-card-body">
+                <div class="settings-grid">
+                    <div class="form-group">
+                        <label>Default Provider</label>
+                        <select name="tts.provider" class="settings-input">
+                            <option value="qwen3_mlx" {{ 'selected' if tts_default_provider == 'qwen3_mlx' }}>Qwen3 MLX</option>
+                            <option value="edge" {{ 'selected' if tts_default_provider == 'edge' }}>Edge TTS</option>
+                            <option value="baidu" {{ 'selected' if tts_default_provider == 'baidu' }}>Baidu</option>
+                            <option value="iflytek" {{ 'selected' if tts_default_provider == 'iflytek' }}>iFlytek</option>
+                            <option value="elevenlabs" {{ 'selected' if tts_default_provider == 'elevenlabs' }}>ElevenLabs</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Default Language</label>
+                        <select name="tts.default_language" class="settings-input">
+                            <option value="zh-CN" {{ 'selected' if tts_default_language == 'zh-CN' }}>Chinese (Mandarin)</option>
+                            <option value="en-US" {{ 'selected' if tts_default_language == 'en-US' }}>English (US)</option>
+                            <option value="en-GB" {{ 'selected' if tts_default_language == 'en-GB' }}>English (UK)</option>
+                            <option value="ja-JP" {{ 'selected' if tts_default_language == 'ja-JP' }}>Japanese</option>
+                            <option value="ko-KR" {{ 'selected' if tts_default_language == 'ko-KR' }}>Korean</option>
+                            <option value="fr-FR" {{ 'selected' if tts_default_language == 'fr-FR' }}>French</option>
+                            <option value="de-DE" {{ 'selected' if tts_default_language == 'de-DE' }}>German</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Provider-specific configs -->
+        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q'} %}
+        {% for section, config in provider_configs.items() %}
+        <div class="settings-card" data-provider-section="{{ section }}">
+            <div class="settings-card-header">
+                <div class="provider-icon icon-{{ section }}">{{ provider_icons.get(section, '?') }}</div>
+                <h2>{{ config.label }}</h2>
+                {% if section == 'edge_tts' %}
+                <span class="provider-badge badge-free">Free</span>
+                {% elif section == 'qwen3_mlx' %}
+                <span class="provider-badge badge-local">Local</span>
+                {% else %}
+                <span class="provider-badge badge-api">API Key Required</span>
+                {% endif %}
+                <button type="button" class="btn-voice-toggle" onclick="toggleVoicePanel('{{ config.voice_provider }}')">Manage Voices</button>
+            </div>
+            <div class="settings-card-body">
+                {% if config.fields %}
+                <div class="settings-grid">
+                    {% for field, value in config.fields.items() %}
+                    <div class="form-group {{ 'full-width' if 'model_name' in field }}">
+                        <label>{{ field | replace('_', ' ') | title }}</label>
+                        {% if 'api_key' in field or 'secret' in field %}
+                        <input type="password" name="{{ section }}.{{ field }}" value="{{ value }}" class="settings-input" placeholder="Enter {{ field | replace('_', ' ') }}">
+                        {% elif 'speed' in field %}
+                        <input type="number" name="{{ section }}.{{ field }}" value="{{ value }}" min="0.5" max="2.0" step="0.1" class="settings-input">
+                        {% elif 'chunk_max_seconds' in field %}
+                        <select name="{{ section }}.{{ field }}" class="settings-input">
+                            <option value="30" {{ 'selected' if value == 30 }}>30s — Conservative (cloned voices)</option>
+                            <option value="60" {{ 'selected' if value == 60 or not value }}>60s — Recommended</option>
+                            <option value="90" {{ 'selected' if value == 90 }}>90s — Faster, occasional artifacts</option>
+                            <option value="120" {{ 'selected' if value == 120 }}>120s — Max (built-in voices only)</option>
+                        </select>
+                        {% else %}
+                        <input type="text" name="{{ section }}.{{ field }}" value="{{ value }}" class="settings-input" placeholder="{{ field | replace('_', ' ') }}">
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            <!-- Voice management panel -->
+            <div class="voice-panel" id="voice-panel-{{ config.voice_provider }}" style="display:none;">
+                <div class="voice-panel-header">
+                    <h3>Voice Library</h3>
+                    <span class="voice-panel-hint">Built-in voices are read-only. Add custom voices below.</span>
+                </div>
+                <div class="voice-lists">
+                    <div class="voice-list-section">
+                        <h4>Built-in Voices</h4>
+                        <div class="voice-list" id="builtin-voices-{{ config.voice_provider }}">Loading...</div>
+                    </div>
+                    <div class="voice-list-section">
+                        <h4>Custom Voices</h4>
+                        <div class="voice-list" id="custom-voices-{{ config.voice_provider }}"></div>
+                    </div>
+                </div>
+                {% if section == 'qwen3_mlx' %}
+                <!-- Voice cloning — Qwen3 MLX exclusive -->
+                <div class="voice-clone-section">
+                    <div class="voice-clone-header">
+                        <h4>Voice Cloning</h4>
+                        <span class="voice-clone-badge">Local Only</span>
+                        <p class="voice-clone-desc">Upload a short audio sample (3-10 seconds) and this model will clone the voice. Runs entirely on your Mac — no data sent anywhere.</p>
+                    </div>
+                    <div class="voice-clone-list" id="cloned-voices-list"></div>
+                    <div class="voice-clone-form">
+                        <div class="voice-clone-upload">
+                            <label for="clone-audio" class="voice-clone-dropzone" id="clone-dropzone">
+                                <span class="clone-upload-icon">&#127908;</span>
+                                <span>Drop audio here or click to upload</span>
+                                <span class="clone-upload-hint">WAV / MP3, 3-10 seconds recommended</span>
+                            </label>
+                            <input type="file" id="clone-audio" accept="audio/*" style="display:none" onchange="onCloneFileSelected(this)">
+                        </div>
+                        <div class="voice-clone-fields">
+                            <input type="text" id="clone-name" placeholder="Voice Name *" class="settings-input">
+                            <select id="clone-lang" class="settings-input">
+                                <option value="zh">Chinese</option>
+                                <option value="en">English</option>
+                                <option value="ja">Japanese</option>
+                                <option value="ko">Korean</option>
+                                <option value="fr">French</option>
+                                <option value="de">German</option>
+                            </select>
+                            <select id="clone-gender" class="settings-input">
+                                <option value="female">Female</option>
+                                <option value="male">Male</option>
+                            </select>
+                            <input type="text" id="clone-desc" placeholder="Description (optional)" class="settings-input">
+                            <input type="text" id="clone-ref-text" placeholder="Text spoken in audio (optional, improves quality)" class="settings-input full-width">
+                            <button type="button" class="btn btn-primary" id="clone-btn" onclick="submitCloneVoice()" disabled>Clone Voice</button>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if section != 'qwen3_mlx' %}
+                <div class="voice-add-form">
+                    <h4>Add Custom Voice (manual)</h4>
+                    <div class="voice-add-fields">
+                        <input type="text" id="new-voice-id-{{ config.voice_provider }}" placeholder="Voice ID *" class="settings-input">
+                        <input type="text" id="new-voice-name-{{ config.voice_provider }}" placeholder="Name *" class="settings-input">
+                        <input type="text" id="new-voice-lang-{{ config.voice_provider }}" placeholder="Language (e.g. en-US) *" class="settings-input">
+                        <select id="new-voice-gender-{{ config.voice_provider }}" class="settings-input">
+                            <option value="">Gender (optional)</option>
+                            <option value="female">Female</option>
+                            <option value="male">Male</option>
+                        </select>
+                        <input type="text" id="new-voice-desc-{{ config.voice_provider }}" placeholder="Description (optional)" class="settings-input">
+                        <button type="button" class="btn btn-sm btn-primary" onclick="addCustomVoice('{{ config.voice_provider }}')">Add Voice</button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+
+        <div class="settings-actions">
+            <button type="submit" class="btn btn-primary">Save Settings</button>
+            <span id="saveStatus" class="save-status">Saved</span>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+function saveSettings(e) {
+    e.preventDefault();
+    var form = document.getElementById('settingsForm');
+    var data = {};
+    form.querySelectorAll('[name]').forEach(function(el) {
+        var parts = el.name.split('.');
+        if (parts.length === 2) {
+            if (!data[parts[0]]) data[parts[0]] = {};
+            var val = el.value;
+            if (el.type === 'number') val = parseFloat(val);
+            data[parts[0]][parts[1]] = val;
+        } else {
+            data[el.name] = el.type === 'number' ? parseFloat(el.value) : el.value;
+        }
+    });
+    fetch('/api/settings', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({settings: data}),
+    }).then(function(r) {
+        if (!r.ok) throw new Error('Save failed');
+        var s = document.getElementById('saveStatus');
+        s.classList.add('show');
+        setTimeout(function() { s.classList.remove('show'); }, 2000);
+    }).catch(function(err) { alert('Error: ' + err.message); });
+}
+
+// --- Voice management ---
+function toggleVoicePanel(provider) {
+    var panel = document.getElementById('voice-panel-' + provider);
+    if (!panel) return;
+    var isOpen = panel.style.display !== 'none';
+    panel.style.display = isOpen ? 'none' : 'block';
+    if (!isOpen) {
+        loadProviderVoices(provider);
+        if (provider === 'qwen3_mlx') loadClonedVoices();
+    }
+}
+
+function loadProviderVoices(provider) {
+    fetch('/api/settings/voices?provider=' + encodeURIComponent(provider))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            renderBuiltinVoices(provider, data.built_in || []);
+            renderCustomVoices(provider, data.custom || []);
+        })
+        .catch(function(e) { console.error('Failed to load voices:', e); });
+}
+
+function renderBuiltinVoices(provider, voices) {
+    var el = document.getElementById('builtin-voices-' + provider);
+    if (!voices.length) { el.innerHTML = '<span class="voice-empty">No built-in voices</span>'; return; }
+    el.innerHTML = voices.map(function(v) {
+        var hidden = v.hidden;
+        var rowClass = hidden ? 'voice-row voice-builtin voice-hidden-row' : 'voice-row voice-builtin';
+        var btnClass = hidden ? 'btn btn-sm btn-unhide' : 'btn btn-sm btn-muted';
+        var btnText = hidden ? 'Show' : 'Hide';
+        var btnAction = hidden
+            ? 'unhideBuiltinVoice(\'' + provider + '\',\'' + esc(v.id) + '\')'
+            : 'hideBuiltinVoice(\'' + provider + '\',\'' + esc(v.id) + '\')';
+        return '<div class="' + rowClass + '">' +
+            '<span class="voice-name">' + esc(v.name) + '</span>' +
+            '<span class="voice-id">' + esc(v.id) + '</span>' +
+            '<span class="voice-tag">' + esc(v.language) + '</span>' +
+            '<span class="voice-tag">' + esc(v.gender) + '</span>' +
+            (v.description ? '<span class="voice-desc">' + esc(v.description) + '</span>' : '') +
+            (hidden ? '<span class="voice-hidden-badge">Hidden</span>' : '') +
+            '<button type="button" class="' + btnClass + '" onclick="' + btnAction + '">' + btnText + '</button>' +
+            '</div>';
+    }).join('');
+}
+
+function renderCustomVoices(provider, voices) {
+    var el = document.getElementById('custom-voices-' + provider);
+    if (!voices.length) { el.innerHTML = '<span class="voice-empty">No custom voices yet</span>'; return; }
+    el.innerHTML = voices.map(function(v) {
+        return '<div class="voice-row voice-custom">' +
+            '<span class="voice-name">' + esc(v.name) + '</span>' +
+            '<span class="voice-id">' + esc(v.id) + '</span>' +
+            '<span class="voice-tag">' + esc(v.language) + '</span>' +
+            (v.gender ? '<span class="voice-tag">' + esc(v.gender) + '</span>' : '') +
+            (v.description ? '<span class="voice-desc">' + esc(v.description) + '</span>' : '') +
+            '<button type="button" class="btn btn-sm btn-danger voice-delete-btn" onclick="deleteCustomVoice(\'' + provider + '\',\'' + esc(v.id) + '\')">Delete</button>' +
+            '</div>';
+    }).join('');
+}
+
+function addCustomVoice(provider) {
+    var id = document.getElementById('new-voice-id-' + provider).value.trim();
+    var name = document.getElementById('new-voice-name-' + provider).value.trim();
+    var lang = document.getElementById('new-voice-lang-' + provider).value.trim();
+    var gender = document.getElementById('new-voice-gender-' + provider).value;
+    var desc = document.getElementById('new-voice-desc-' + provider).value.trim();
+    if (!id || !name || !lang) { alert('Voice ID, Name, and Language are required.'); return; }
+    fetch('/api/settings/voices', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({provider: provider, id: id, name: name, language: lang, gender: gender, description: desc}),
+    }).then(function(r) {
+        if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || 'Failed'); });
+        // Clear form
+        document.getElementById('new-voice-id-' + provider).value = '';
+        document.getElementById('new-voice-name-' + provider).value = '';
+        document.getElementById('new-voice-lang-' + provider).value = '';
+        document.getElementById('new-voice-gender-' + provider).value = '';
+        document.getElementById('new-voice-desc-' + provider).value = '';
+        loadProviderVoices(provider);
+    }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function deleteCustomVoice(provider, voiceId) {
+    if (!confirm('Delete voice "' + voiceId + '"?')) return;
+    fetch('/api/settings/voices', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({provider: provider, id: voiceId}),
+    }).then(function(r) {
+        if (!r.ok) throw new Error('Delete failed');
+        loadProviderVoices(provider);
+    }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function hideBuiltinVoice(provider, voiceId) {
+    fetch('/api/settings/voices/hide', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({provider: provider, id: voiceId}),
+    }).then(function(r) {
+        if (!r.ok) throw new Error('Hide failed');
+        loadProviderVoices(provider);
+    }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function unhideBuiltinVoice(provider, voiceId) {
+    fetch('/api/settings/voices/unhide', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({provider: provider, id: voiceId}),
+    }).then(function(r) {
+        if (!r.ok) throw new Error('Unhide failed');
+        loadProviderVoices(provider);
+    }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
+function esc(s) {
+    var d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+}
+
+// --- Voice cloning (Qwen3 MLX only) ---
+var _cloneFile = null;
+
+function onCloneFileSelected(input) {
+    if (input.files && input.files[0]) {
+        _cloneFile = input.files[0];
+        var dz = document.getElementById('clone-dropzone');
+        dz.classList.add('has-file');
+        dz.querySelector('span:nth-child(2)').textContent = _cloneFile.name;
+        document.getElementById('clone-btn').disabled = false;
+    }
+}
+
+function loadClonedVoices() {
+    fetch('/api/settings/cloned-voices').then(function(r) { return r.json(); })
+        .then(function(voices) {
+            var el = document.getElementById('cloned-voices-list');
+            if (!el) return;
+            if (!voices.length) { el.innerHTML = '<span class="voice-empty">No cloned voices yet</span>'; return; }
+            el.innerHTML = voices.map(function(v) {
+                return '<div class="voice-row voice-cloned">' +
+                    '<span class="voice-name">' + esc(v.name) + '</span>' +
+                    '<span class="voice-id">' + esc(v.id) + '</span>' +
+                    '<span class="voice-tag">' + esc(v.language) + '</span>' +
+                    '<span class="voice-tag">' + esc(v.gender) + '</span>' +
+                    (v.description ? '<span class="voice-desc">' + esc(v.description) + '</span>' : '') +
+                    '<span class="voice-clone-src-tag">Cloned</span>' +
+                    '<button type="button" class="btn btn-sm btn-danger voice-delete-btn" onclick="deleteClonedVoice(\'' + esc(v.id) + '\')">Delete</button>' +
+                    '</div>';
+            }).join('');
+        }).catch(function(e) { console.error('Failed to load cloned voices:', e); });
+}
+
+function submitCloneVoice() {
+    if (!_cloneFile) { alert('Please select an audio file.'); return; }
+    var name = document.getElementById('clone-name').value.trim();
+    if (!name) { alert('Voice name is required.'); return; }
+    var btn = document.getElementById('clone-btn');
+    btn.disabled = true;
+    btn.textContent = 'Cloning...';
+    var form = new FormData();
+    form.append('file', _cloneFile);
+    form.append('name', name);
+    form.append('language', document.getElementById('clone-lang').value);
+    form.append('gender', document.getElementById('clone-gender').value);
+    form.append('description', document.getElementById('clone-desc').value.trim());
+    form.append('ref_text', document.getElementById('clone-ref-text').value.trim());
+    fetch('/api/settings/cloned-voices', { method: 'POST', body: form })
+        .then(function(r) {
+            if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || 'Clone failed'); });
+            // Clear form
+            document.getElementById('clone-name').value = '';
+            document.getElementById('clone-desc').value = '';
+            document.getElementById('clone-ref-text').value = '';
+            _cloneFile = null;
+            var dz = document.getElementById('clone-dropzone');
+            dz.classList.remove('has-file');
+            dz.querySelector('span:nth-child(2)').textContent = 'Drop audio here or click to upload';
+            btn.textContent = 'Clone Voice';
+            btn.disabled = true;
+            loadClonedVoices();
+            loadProviderVoices('qwen3_mlx');
+        }).catch(function(e) {
+            alert('Error: ' + e.message);
+            btn.textContent = 'Clone Voice';
+            btn.disabled = false;
+        });
+}
+
+function deleteClonedVoice(voiceId) {
+    if (!confirm('Delete cloned voice "' + voiceId + '"?')) return;
+    fetch('/api/settings/cloned-voices', {
+        method: 'DELETE',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id: voiceId}),
+    }).then(function(r) {
+        if (!r.ok) throw new Error('Delete failed');
+        loadClonedVoices();
+        loadProviderVoices('qwen3_mlx');
+    }).catch(function(e) { alert('Error: ' + e.message); });
+}
+</script>
+{% endblock %}

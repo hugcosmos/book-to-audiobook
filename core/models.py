@@ -41,23 +41,23 @@ class BookMetadata(BaseModel):
     author: str = "Unknown"
     format: BookFormat
     file_path: str
+    cover_path: str = ""
     chapters: list[Chapter] = Field(default_factory=list)
     conversions: list[ConversionRecord] = Field(default_factory=list)
     uploaded_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
 class TTSConfig(BaseModel):
-    voice: str = "zh-CN-XiaoxiaoNeural"
+    voice: str = "vivian"
     language: str = "zh-CN"
-    rate: str = "+0%"
-    volume: str = "+0%"
-    pitch: str = "+0Hz"
+    speed: float = 1.0
 
 
 class ConversionRequest(BaseModel):
     book_id: str
     selected_chapters: list[int]
     tts_config: TTSConfig = Field(default_factory=TTSConfig)
+    tts_provider: str | None = None
     output_m4b: bool = True
     output_mp3: bool = True
 

@@ -1,20 +1,23 @@
 from __future__ import annotations
 
+import shutil
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from core.models import ConversionRequest, TTSConfig
+from config.settings import settings
+from core.models import ConversionRequest, ConversionStatus, TTSConfig
 
 router = APIRouter()
 
 
 class ConvertBody(BaseModel):
     selected_chapters: list[int]
-    voice: str = "zh-CN-XiaoxiaoNeural"
+    provider: str | None = None
+    voice: str = "vivian"
     language: str = "zh-CN"
-    rate: str = "+0%"
-    volume: str = "+0%"
-    pitch: str = "+0Hz"
+    speed: float | None = None
     output_m4b: bool = True
     output_mp3: bool = True
 
@@ -26,16 +29,23 @@ async def start_convert(book_id: str, body: ConvertBody):
     book = converter.get_book(book_id)
     if not book:
         raise HTTPException(404, "Book not found")
+    # Resolve speed: use conversion page value if set, otherwise provider default from settings
+    effective_speed = body.speed
+    if effective_speed is None:
+        provider = body.provider or settings.tts.provider
+        if provider == "qwen3_mlx":
+            effective_speed = settings.qwen3_mlx.speed
+        else:
+            effective_speed = 1.0
     req = ConversionRequest(
         book_id=book_id,
         selected_chapters=body.selected_chapters,
         tts_config=TTSConfig(
             voice=body.voice,
             language=body.language,
-            rate=body.rate,
-            volume=body.volume,
-            pitch=body.pitch,
+            speed=effective_speed,
         ),
+        tts_provider=body.provider,
         output_m4b=body.output_m4b,
         output_mp3=body.output_mp3,
     )
@@ -49,7 +59,7 @@ async def get_status(book_id: str):
     converter = app.state.converter
     status = converter.get_status(book_id)
     if not status:
-        raise HTTPException(404, "Conversion job not found")
+        return ConversionStatus(book_id=book_id, state="lost").model_dump()
     return status.model_dump()
 
 
@@ -59,3 +69,73 @@ async def cancel_convert(book_id: str):
     converter = app.state.converter
     converter.cancel(book_id)
     return {"book_id": book_id, "status": "cancelling"}
+
+
+@router.delete("/api/books/{book_id}")
+async def delete_book(book_id: str):
+    """Delete a book and all associated files."""
+    from app.main import app
+    converter = app.state.converter
+    book = converter.get_book(book_id)
+    if not book:
+        raise HTTPException(404, "Book not found")
+    # Delete output files
+    out_dir = settings.output_dir / book_id
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+    # Delete upload files
+    upload_dir = settings.upload_dir / book_id
+    if upload_dir.exists():
+        shutil.rmtree(upload_dir)
+    # Remove from memory
+    converter.delete_book(book_id)
+    return {"ok": True}
+
+
+@router.delete("/api/convert/{book_id}/record/{timestamp}")
+async def delete_conversion_record(book_id: str, timestamp: str):
+    """Delete a conversion record and its output files."""
+    from app.main import app
+    converter = app.state.converter
+    book = converter.get_book(book_id)
+    if not book:
+        raise HTTPException(404, "Book not found")
+    # Find the record
+    record = None
+    for rec in book.conversions:
+        if rec.timestamp == timestamp:
+            record = rec
+            break
+    if not record:
+        raise HTTPException(404, "Conversion record not found")
+    # Delete output files
+    out_dir = settings.output_dir / book_id
+    for f in record.output_files:
+        fpath = Path(f.path)
+        if fpath.exists():
+            fpath.unlink()
+    # Remove record from book
+    book.conversions = [r for r in book.conversions if r.timestamp != timestamp]
+    converter.save_book(book)
+    return {"ok": True}
+
+
+class UpdateBookBody(BaseModel):
+    title: str | None = None
+    author: str | None = None
+
+
+@router.put("/api/books/{book_id}")
+async def update_book(book_id: str, body: UpdateBookBody):
+    """Update book metadata (title, author)."""
+    from app.main import app
+    converter = app.state.converter
+    book = converter.get_book(book_id)
+    if not book:
+        raise HTTPException(404, "Book not found")
+    if body.title is not None:
+        book.title = body.title.strip() or book.title
+    if body.author is not None:
+        book.author = body.author.strip() or book.author
+    converter.save_book(book)
+    return {"ok": True, "title": book.title, "author": book.author}

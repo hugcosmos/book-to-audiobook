@@ -31,3 +31,9 @@ Thumbs.db
 
 # Claude Code local config
 .claude/
+
+# User settings (contains API keys)
+config/user_settings.json
+
+# Test artifacts
+*.wav

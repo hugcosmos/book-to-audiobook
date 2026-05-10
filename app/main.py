@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from app.routes import chapters, convert, download, upload
+from app.routes import chapters, convert, download, settings as settings_route, tts, upload
 from config.settings import settings
 from core.converter import Converter
 
@@ -27,15 +27,34 @@ app.include_router(upload.router)
 app.include_router(chapters.router)
 app.include_router(convert.router)
 app.include_router(download.router)
+app.include_router(tts.router)
+app.include_router(settings_route.router)
+
+# Load persisted user settings
+from config.user_settings import load_user_settings
+load_user_settings()
+
+
+def get_available_formats() -> list[str]:
+    """Get list of actually available formats based on system dependencies."""
+    from core.book_parser.parser_factory import SUPPORTED_FORMATS
+    available = []
+    for fmt in sorted(SUPPORTED_FORMATS):
+        if fmt in {"epub", "pdf", "txt"}:
+            available.append(fmt)
+        elif fmt in {"mobi", "azw3"}:
+            from utils.ffmpeg_utils import check_ebook_convert
+            if check_ebook_convert():
+                available.append(fmt)
+    return available
 
 
 @app.get("/")
 async def index(request: Request):
     books = converter.get_all_books()
-    from core.book_parser.parser_factory import SUPPORTED_FORMATS
     return templates.TemplateResponse(
         request, "index.html",
-        {"books": books, "supported_formats": sorted(SUPPORTED_FORMATS)},
+        {"books": books, "supported_formats": get_available_formats()},
     )
 
 

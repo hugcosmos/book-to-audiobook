@@ -9,6 +9,9 @@ from config.settings import settings
 
 router = APIRouter()
 
+# Cover images served from uploads dir
+_COVER_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
+
 
 @router.get("/download/{book_id}/{fmt}")
 async def download_file(book_id: str, fmt: str):
@@ -47,3 +50,17 @@ async def download_named_file(book_id: str, filename: str):
         media_type="application/octet-stream",
         filename=file_path.name,
     )
+
+
+@router.get("/cover/{book_id}")
+async def get_cover(book_id: str):
+    """Serve book cover image from uploads dir."""
+    upload_dir = settings.upload_dir / book_id
+    if not upload_dir.exists():
+        raise HTTPException(404, "Book not found")
+    for ext in _COVER_EXTS:
+        cover = upload_dir / f"cover{ext}"
+        if cover.exists():
+            media = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp", "gif": "image/gif"}
+            return FileResponse(str(cover), media_type=media.get(ext.lstrip("."), "image/jpeg"))
+    raise HTTPException(404, "No cover found")

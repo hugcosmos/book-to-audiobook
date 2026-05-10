@@ -10,24 +10,27 @@
         <div class="upload-icon">&#x1F4E5;</div>
         <p>Drag & drop ebook here, or click to select</p>
         <p class="hint">Supported: {{ supported_formats | join(', ') | upper }}</p>
-        <input type="file" id="fileInput" accept=".epub,.mobi,.azw3,.pdf,.txt" hidden>
+        <input type="file" id="fileInput" accept="{% for fmt in supported_formats %}.{{ fmt }}{% if not loop.last %},{% endif %}{% endfor %}" hidden>
     </div>
     <div id="uploadStatus" class="status-msg hidden"></div>
 
     {% if books %}
     <div class="books-grid">
         {% for book in books %}
-        <a href="/books/{{ book.id }}" class="book-card">
-            <div class="book-card-title">{{ book.title }}</div>
-            <div class="book-card-author">{{ book.author }}</div>
-            <div class="book-card-meta">
-                <span class="tag">{{ book.format.value | upper }}</span>
-                <span>{{ book.chapters | length }} chapters</span>
-                {% if book.conversions %}
-                <span class="tag tag-green">{{ book.conversions | length }} converted</span>
-                {% endif %}
-            </div>
-        </a>
+        <div class="book-card-wrapper">
+            <a href="/books/{{ book.id }}" class="book-card">
+                <div class="book-card-title">{{ book.title }}</div>
+                <div class="book-card-author">{{ book.author }}</div>
+                <div class="book-card-meta">
+                    <span class="tag">{{ book.format.value | upper }}</span>
+                    <span>{{ book.chapters | length }} chapters</span>
+                    {% if book.conversions %}
+                    <span class="tag tag-green">{{ book.conversions | length }} converted</span>
+                    {% endif %}
+                </div>
+            </a>
+            <button class="btn-delete-book" onclick="deleteBook('{{ book.id }}', '{{ book.title | replace("'", "\\'") }}')" title="Delete book">&times;</button>
+        </div>
         {% endfor %}
     </div>
     {% else %}
@@ -38,8 +41,19 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/app.js"></script>
+<script src="/static/js/app.js?v=3"></script>
 <script>
 initUpload();
+function deleteBook(id, title) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!confirm('Delete "' + title + '"?\nAll generated audio files will be permanently removed.')) return;
+    fetch('/api/books/' + id, {method: 'DELETE'})
+        .then(function(r) {
+            if (!r.ok) throw new Error('Delete failed');
+            location.reload();
+        })
+        .catch(function(e) { alert('Error: ' + e.message); });
+}
 </script>
 {% endblock %}

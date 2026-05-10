@@ -30,10 +30,18 @@ async function uploadFile(file) {
     var form = new FormData();
     form.append('file', file);
     try {
-        var resp = await fetch('/api/upload', { method: 'POST', body: form });
-        var data = await resp.json();
+        // Use XMLHttpRequest to bypass the fetch wrapper in base.html
+        var resp = await new Promise(function(resolve, reject) {
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/upload');
+            xhr.onload = function() {
+                resolve({ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, json: function() { return JSON.parse(xhr.responseText); }});
+            };
+            xhr.onerror = function() { reject(new Error('Network error')); };
+            xhr.send(form);
+        });
+        var data = resp.json();
         if (!resp.ok) throw new Error(data.detail || 'Upload failed');
-        // Navigate to book detail page
         window.location.href = '/books/' + data.book_id;
     } catch (e) {
         status.textContent = 'Error: ' + e.message;
@@ -45,18 +53,99 @@ function toggleAll(checked) {
     document.querySelectorAll('input[name="chapters"]').forEach(function(cb) { cb.checked = checked; });
 }
 
-// Voice data
-function updateVoices() {
-    var lang = document.getElementById('language').value;
-    var voiceSelect = document.getElementById('voice');
-    var voices = voiceData[lang] || voiceData['en-US'];
-    voiceSelect.innerHTML = '';
-    voices.forEach(function(v) {
-        var opt = document.createElement('option');
-        opt.value = v;
-        opt.textContent = v;
-        voiceSelect.appendChild(opt);
+// --- TTS Provider / Voice dynamic loading ---
+
+var _providers = [];
+var _currentProvider = '';
+
+async function initTTSUI() {
+    await loadProviders();
+    await loadVoices();
+    await loadDefaultSpeed();
+    // Auto-sync speed when returning from settings tab
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) loadDefaultSpeed();
     });
+}
+
+async function loadDefaultSpeed() {
+    try {
+        var resp = await fetch('/api/settings');
+        var data = await resp.json();
+        var provider = document.getElementById('provider').value;
+        var speed = 1.0;
+        if (provider === 'qwen3_mlx' && data.qwen3_mlx && data.qwen3_mlx.speed != null) {
+            speed = data.qwen3_mlx.speed;
+        }
+        var el = document.getElementById('speed');
+        if (el) {
+            el.value = speed;
+            var label = document.getElementById('speedLabel');
+            if (label) label.textContent = speed + 'x';
+        }
+    } catch (e) {
+        console.error('Failed to load default speed:', e);
+    }
+}
+
+async function loadProviders() {
+    try {
+        var resp = await fetch('/api/tts/providers');
+        _providers = await resp.json();
+        var sel = document.getElementById('provider');
+        if (!sel) return;
+        sel.innerHTML = '';
+        _providers.forEach(function(p) {
+            var opt = document.createElement('option');
+            opt.value = p.name;
+            opt.textContent = p.label + (p.configured ? '' : ' (未配置)');
+            opt.disabled = !p.configured;
+            sel.appendChild(opt);
+        });
+        _currentProvider = sel.value;
+    } catch (e) {
+        console.error('Failed to load providers:', e);
+    }
+}
+
+async function onProviderChange() {
+    _currentProvider = document.getElementById('provider').value;
+    await loadVoices();
+    await loadDefaultSpeed();
+}
+
+async function onLanguageChange() {
+    await loadVoices();
+}
+
+async function loadVoices() {
+    var lang = document.getElementById('language').value;
+    var sel = document.getElementById('voice');
+    if (!sel || !_currentProvider) return;
+    try {
+        var url = '/api/tts/voices?provider=' + encodeURIComponent(_currentProvider);
+        if (lang) url += '&language=' + encodeURIComponent(lang);
+        var resp = await fetch(url);
+        var voices = await resp.json();
+        sel.innerHTML = '';
+        if (voices.length === 0) {
+            var opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = 'No voices available for this language';
+            opt.disabled = true;
+            opt.selected = true;
+            sel.appendChild(opt);
+            return;
+        }
+        voices.forEach(function(v) {
+            var opt = document.createElement('option');
+            opt.value = v.id;
+            opt.textContent = v.name + (v.description ? ' - ' + v.description : '');
+            sel.appendChild(opt);
+        });
+    } catch (e) {
+        console.error('Failed to load voices:', e);
+    }
 }
 
 // Conversion with inline progress
@@ -69,12 +158,12 @@ async function startConvert(bookId) {
     });
     if (selected.length === 0) { alert('Please select at least one chapter'); return; }
 
-    var rate = document.getElementById('rate').value;
     var body = {
         selected_chapters: selected,
+        provider: document.getElementById('provider').value,
         voice: document.getElementById('voice').value,
         language: document.getElementById('language').value,
-        rate: (rate >= 0 ? '+' : '') + rate + '%',
+        speed: parseFloat(document.getElementById('speed').value),
         output_m4b: document.getElementById('outM4b').checked,
         output_mp3: document.getElementById('outMp3').checked,
     };
@@ -87,7 +176,6 @@ async function startConvert(bookId) {
         });
         var data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || 'Failed to start conversion');
-        // Show inline progress
         showProgress();
         startPolling(bookId);
     } catch (e) {
@@ -117,7 +205,11 @@ async function pollStatus(bookId) {
     try {
         var resp = await fetch('/api/convert/' + bookId + '/status');
         var data = await resp.json();
-        if (!resp.ok) return;
+        if (!resp.ok) {
+            clearInterval(_pollTimer);
+            hideProgress();
+            return;
+        }
 
         var fill = document.getElementById('progressFill');
         var text = document.getElementById('progressText');
@@ -127,19 +219,31 @@ async function pollStatus(bookId) {
 
         if (!fill) return;
 
-        fill.style.width = data.progress_percent.toFixed(1) + '%';
-        text.textContent = data.progress_percent.toFixed(1) + '% (' + data.completed_chapters + '/' + data.total_chapters + ')';
-        chapter.textContent = data.current_chapter ? 'Converting: ' + data.current_chapter : '';
+        if (data.state === 'lost') {
+            clearInterval(_pollTimer);
+            chapter.textContent = 'Server restarted \u2014 conversion state lost. Please start a new conversion.';
+            cancel.classList.add('hidden');
+            hideProgress();
+            return;
+        }
 
-        // Highlight converting chapter
+        fill.style.width = data.progress_percent.toFixed(1) + '%';
+        var pctText = data.progress_percent.toFixed(1) + '%';
+        if (data.completed_chapters > 0) {
+            pctText += ' \u2014 chapter ' + data.completed_chapters + '/' + data.total_chapters;
+        }
+        text.textContent = pctText;
+        chapter.textContent = data.current_chapter ? data.current_chapter : '';
+
+        // Highlight converting chapter (match by title prefix before " (chunk")
+        var activeTitle = data.current_chapter ? data.current_chapter.split(' (chunk')[0].split(' (preparing')[0].trim() : '';
         document.querySelectorAll('.chapter-item').forEach(function(el) {
             el.classList.remove('converting');
         });
-        if (data.state === 'running' && data.current_chapter) {
-            var items = document.querySelectorAll('.chapter-item');
-            items.forEach(function(el) {
+        if (data.state === 'running' && activeTitle) {
+            document.querySelectorAll('.chapter-item').forEach(function(el) {
                 var titleEl = el.querySelector('.ch-title');
-                if (titleEl && titleEl.textContent.trim() === data.current_chapter) {
+                if (titleEl && titleEl.textContent.trim() === activeTitle) {
                     el.classList.add('converting');
                 }
             });
@@ -148,7 +252,6 @@ async function pollStatus(bookId) {
         if (data.state === 'completed') {
             clearInterval(_pollTimer);
             cancel.classList.add('hidden');
-            // Reload page to show new conversion in history
             setTimeout(function() { window.location.reload(); }, 500);
         } else if (data.state === 'failed') {
             clearInterval(_pollTimer);
@@ -167,4 +270,55 @@ async function pollStatus(bookId) {
 
 async function cancelConvert(bookId) {
     await fetch('/api/convert/' + bookId + '/cancel', { method: 'POST' });
+}
+
+// Voice preview
+var _previewAudio = null;
+
+async function previewVoice() {
+    var btn = document.getElementById('previewBtn');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = '\u23F3 Loading...';
+
+    // Stop previous preview if playing
+    if (_previewAudio) {
+        _previewAudio.pause();
+        _previewAudio = null;
+    }
+
+    try {
+        var resp = await fetch('/api/tts/preview', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                provider: document.getElementById('provider').value,
+                voice: document.getElementById('voice').value,
+                language: document.getElementById('language').value,
+                speed: parseFloat(document.getElementById('speed').value),
+            }),
+        });
+        if (!resp.ok) {
+            var msg = 'Preview failed';
+            try { var err = await resp.json(); msg = err.detail || msg; } catch(e) {}
+            throw new Error(msg);
+        }
+        var blob = await resp.blob();
+        var url = URL.createObjectURL(blob);
+        _previewAudio = new Audio(url);
+        _previewAudio.onended = function() {
+            btn.disabled = false;
+            btn.textContent = '\u25B6 Preview Voice';
+            URL.revokeObjectURL(url);
+        };
+        _previewAudio.onerror = function() {
+            btn.disabled = false;
+            btn.textContent = '\u25B6 Preview Voice';
+        };
+        _previewAudio.play();
+    } catch (e) {
+        alert('Preview error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = '\u25B6 Preview Voice';
+    }
 }

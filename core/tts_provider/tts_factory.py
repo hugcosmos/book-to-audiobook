@@ -1,10 +1,29 @@
 from __future__ import annotations
 
+from importlib import import_module
+
+from config.settings import settings
 from core.models import TTSConfig
 from core.tts_provider.base_tts import BaseTTSProvider
-from core.tts_provider.edge_tts import EdgeTTSProvider
+
+_PROVIDER_MAP: dict[str, tuple[str, str]] = {
+    "qwen3_mlx": ("core.tts_provider.qwen3_mlx_tts", "Qwen3MLXTTSProvider"),
+    "edge": ("core.tts_provider.edge_tts", "EdgeTTSProvider"),
+    "baidu": ("core.tts_provider.baidu_tts", "BaiduTTSProvider"),
+    "iflytek": ("core.tts_provider.iflytek_tts", "IflytekTTSProvider"),
+    "elevenlabs": ("core.tts_provider.elevenlabs_tts", "ElevenLabsTTSProvider"),
+}
 
 
-def get_tts_provider(config: TTSConfig | None = None) -> BaseTTSProvider:
+def get_tts_provider(config: TTSConfig | None = None, provider: str | None = None) -> BaseTTSProvider:
     config = config or TTSConfig()
-    return EdgeTTSProvider(config)
+    name = provider or settings.tts.provider
+    if name not in _PROVIDER_MAP:
+        raise ValueError(
+            f"Unknown TTS provider: {name}. Available: {list(_PROVIDER_MAP)}"
+        )
+    module_path, class_name = _PROVIDER_MAP[name]
+    module = import_module(module_path)
+    cls = getattr(module, class_name)
+    cls.validate_config(config)
+    return cls(config)

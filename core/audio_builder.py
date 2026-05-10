@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import subprocess
-import tempfile
 from pathlib import Path
 
 from pydub import AudioSegment
@@ -18,6 +17,7 @@ class AudioBuilder:
         output_path: Path,
         book_title: str,
         book_author: str,
+        cover_path: str | None = None,
     ) -> Path:
         if not chapter_files:
             raise ValueError("No chapter files to build M4B")
@@ -35,11 +35,19 @@ class AudioBuilder:
         # Concatenate audio
         combined_mp3 = output_path.parent / "combined_temp.mp3"
         self._concat_audio([f for _, f in chapter_files], combined_mp3)
-        # Build M4B
+        # Build M4B with optional cover image
         cmd = [
             "ffmpeg", "-y",
             "-i", str(combined_mp3),
             "-i", str(metadata_path),
+        ]
+        if cover_path and Path(cover_path).exists():
+            cmd += ["-i", str(cover_path)]
+            cmd += [
+                "-map", "0:a", "-map", "2:v",
+                "-c:v", "mjpeg", "-disposition:v", "attached_pic",
+            ]
+        cmd += [
             "-map_metadata", "1",
             "-map_chapters", "1",
             "-c:a", "aac",
@@ -51,6 +59,8 @@ class AudioBuilder:
         if result.returncode != 0:
             log.error("ffmpeg M4B build failed: %s", result.stderr)
             raise RuntimeError(f"M4B build failed: {result.stderr}")
+        # Patch ftyp brand from M4A/isom to M4B so Apple Books recognizes audiobook chapters
+        self._patch_m4b_brand(output_path)
         # Cleanup temp files
         combined_mp3.unlink(missing_ok=True)
         metadata_path.unlink(missing_ok=True)
@@ -74,6 +84,30 @@ class AudioBuilder:
         for f in files:
             merged += AudioSegment.from_mp3(str(f))
         merged.export(str(output), format="mp3", bitrate="128k")
+
+    @staticmethod
+    def _patch_m4b_brand(path: Path) -> None:
+        """Patch ftyp box major brand to M4B for Apple Books chapter support."""
+        M4B = b"M4B "
+        with open(path, "r+b") as f:
+            # ftyp is always the first atom: [size(4)][ftyp(4)][brand(4)][version(4)][compat...]
+            header = f.read(64)
+            idx = header.find(b"ftyp")
+            if idx < 0:
+                return
+            brand_offset = idx + 4
+            f.seek(brand_offset)
+            old_brand = f.read(4)
+            f.seek(brand_offset)
+            f.write(M4B)
+            # Patch compatible_brands: replace M4A/isom with M4B
+            compat_start = brand_offset + 8
+            for pos in range(compat_start, len(header) - 3, 4):
+                chunk = header[pos:pos + 4]
+                if chunk in (b"M4A ", b"isom"):
+                    f.seek(pos)
+                    f.write(M4B)
+        log.info("Patched M4B brand: %s -> M4B", old_brand)
 
     def _generate_ffmetadata(
         self,
