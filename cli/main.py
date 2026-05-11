@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
+import uuid
 from pathlib import Path
 
 import click
@@ -15,7 +17,7 @@ load_user_settings()
 from core.tts_provider.tts_factory import get_tts_provider
 from core.text_processor import TextProcessor
 from core.audio_builder import AudioBuilder
-from core.models import Chapter, TTSConfig
+from core.models import BookMetadata, Chapter, ConversionRecord, OutputFile, TTSConfig
 
 console = Console()
 
@@ -37,6 +39,41 @@ def _combined_label(selected: list, book_title: str, total_chapters: int) -> str
     if is_contiguous:
         return f"{book_title} - {selected[0].title}~{selected[-1].title}"
     return f"{book_title} - {selected[0].title}等{n}章"
+
+
+def _ensure_registered(input_path: Path) -> BookMetadata:
+    """Ensure book is in uploads library. Return existing or newly registered BookMetadata."""
+    from core.converter import Converter
+
+    converter = Converter()
+    resolved = input_path.resolve()
+
+    # Check if already registered by matching file path
+    for book in converter._books.values():
+        if Path(book.file_path).resolve() == resolved:
+            return book
+
+    # Register new book
+    book_id = uuid.uuid4().hex[:12]
+    upload_dir = settings.upload_dir / book_id
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    dest = upload_dir / input_path.name
+    shutil.copy2(str(input_path), str(dest))
+
+    parser = get_parser(str(dest))
+    metadata = parser.get_metadata()
+    metadata.id = book_id
+    metadata.file_path = str(dest)
+    metadata.chapters = parser.get_chapters()
+
+    if hasattr(parser, "extract_cover"):
+        cover_path = parser.extract_cover(upload_dir)
+        if cover_path:
+            metadata.cover_path = cover_path
+
+    converter.add_book(metadata)
+    console.print(f"[dim]Registered book: {metadata.title} (id: {book_id})[/dim]")
+    return metadata
 
 
 @click.group()
@@ -80,23 +117,38 @@ Examples:
 
   # Use local qwen3_mlx model
   book2audio convert book.epub -p qwen3_mlx --model-path ~/.cache/huggingface/hub/models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit""")
-@click.argument("input_file", type=click.Path(exists=True))
+@click.argument("input_file", required=False, type=click.Path(exists=True))
 @click.option("--chapters", "-c", default=None, help="Chapter range to convert (e.g., '1-5,7,10-' for chapters 1-5, 7, and 10 onwards)")
 @click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx")
 @click.option("--voice", "-v", default="vivian", help="Voice name (use 'book2audio voice list' to see available voices)")
 @click.option("--language", "-l", default="zh-CN", help="Language code (e.g., zh-CN, en-US, ja-JP)")
 @click.option("--speed", "-s", type=float, default=None, help="Speech speed (0.5-2.0, default: 1.0)")
 @click.option("--model-path", default=None, help="Path to local model directory (for qwen3_mlx provider)")
-@click.option("--book-id", default=None, help="Existing book ID (adds output to library book)")
+@click.option("--book-id", default=None, help="Existing book ID (convert without file path)")
 def convert(input_file, chapters, provider, voice, language, speed, model_path, book_id):
-    input_path = Path(input_file)
-    
-    console.print(f"\n[bold blue]📚 Input:[/bold blue] {input_path.resolve()}")
-    
-    parser = get_parser(str(input_path))
-    all_chapters = parser.get_chapters()
+    if not input_file and not book_id:
+        console.print("[red]Error: Provide INPUT_FILE or --book-id[/red]")
+        raise SystemExit(1)
+
+    input_path = Path(input_file) if input_file else None
+    if input_path:
+        console.print(f"\n[bold blue]📚 Input:[/bold blue] {input_path.resolve()}")
+
+    from core.converter import Converter
+    converter = Converter()
+
+    if book_id:
+        book = converter.get_book(book_id)
+        if not book:
+            console.print(f"[red]Book not found: {book_id}[/red]")
+            raise SystemExit(1)
+        console.print(f"[bold blue]📁 Output:[/bold blue] Using existing library book: {book_id}")
+    else:
+        book = _ensure_registered(input_path)
+
+    all_chapters = book.chapters
     console.print(f"[bold blue]📖 Chapters:[/bold blue] {len(all_chapters)} found")
-    
+
     if chapters:
         selected_indices = _parse_chapter_range(chapters, len(all_chapters))
         selected_chapters = [all_chapters[i] for i in selected_indices]
@@ -104,51 +156,45 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
     else:
         selected_chapters = all_chapters
         console.print(f"[bold blue]✅ Selected:[/bold blue] All {len(selected_chapters)} chapters")
-    
+
     effective_provider = provider or settings.tts.provider
     console.print(f"[bold blue]🔊 Provider:[/bold blue] {effective_provider}")
     console.print(f"[bold blue]🗣️ Voice:[/bold blue] {voice}")
     console.print(f"[bold blue]🌐 Language:[/bold blue] {language}")
-    
+
     if speed is None:
         if effective_provider == "qwen3_mlx":
             speed = settings.qwen3_mlx.speed
         else:
             speed = 1.0
     console.print(f"[bold blue]⚡ Speed:[/bold blue] {speed}x")
-    
+
     config = TTSConfig(voice=voice, language=language, speed=speed)
     if model_path:
         config.model_path = model_path
         console.print(f"[bold blue]📦 Model Path:[/bold blue] {model_path}")
-    
+
     tts = get_tts_provider(provider=effective_provider, config=config)
     text_processor = TextProcessor()
-    
-    cover_path = None
-    book_title = input_path.stem
-    book_author = ""
-    
-    if book_id:
-        output_dir = settings.output_dir / book_id
-        console.print(f"[bold blue]📁 Output:[/bold blue] Using existing library book: {book_id}")
-        from core.converter import Converter
-        converter = Converter()
-        book = converter.get_book(book_id)
-        if book:
-            book_title = book.title or input_path.stem
-            book_author = book.author or ""
-            cover_path = book.cover_path if book.cover_path else None
-    else:
-        output_dir = settings.output_dir / input_path.stem
+
+    book_title = book.title or (input_path.stem if input_path else "audiobook")
+    book_author = book.author or ""
+    cover_path = book.cover_path if book.cover_path else None
+
+    output_dir = settings.output_dir / book.id
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
+    # Reload chapter text from parser (meta.json strips text)
+    parser = get_parser(book.file_path)
+    full_chapters = parser.get_chapters()
+    text_map = {ch.index: ch.text for ch in full_chapters}
+
     chapter_files = []
     audio_builder = AudioBuilder()
-    
+
     async def synthesis_task(chapter_idx, chapter_text, chapter_title, output_path):
         await tts.synthesize(chapter_text, output_path)
-    
+
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
@@ -157,31 +203,51 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
         console=console
     ) as progress:
         task = progress.add_task(f"Converting {len(selected_chapters)} chapters...", total=len(selected_chapters))
-        
+
         for i, chapter in enumerate(selected_chapters):
             progress.update(task, advance=1, description=f"Chapter {chapter.index}: {chapter.title[:30]}...")
-            
-            cleaned_text = text_processor.clean(chapter.text)
-            
-            chapter_mp3_path = output_dir / _safe_filename(f"{book_title} - {chapter.title}.mp3")
-            asyncio.run(synthesis_task(i, cleaned_text, chapter.title, chapter_mp3_path))
-            chapter_files.append((chapter, chapter_mp3_path))
-    
+
+            chapter_text = chapter.text or text_map.get(chapter.index, "")
+            cleaned_text = text_processor.clean(chapter_text)
+
+            temp_mp3 = output_dir / f"_tmp_{chapter.index:04d}.mp3"
+            asyncio.run(synthesis_task(i, cleaned_text, chapter.title, temp_mp3))
+            named_mp3 = output_dir / _safe_filename(f"{book_title} - {chapter.title}.mp3")
+            temp_mp3.rename(named_mp3)
+            chapter_files.append((chapter, named_mp3))
+
+    output_files: list[OutputFile] = []
+
+    # Per-chapter MP3s
+    for chapter, ch_path in chapter_files:
+        output_files.append(OutputFile(
+            path=str(ch_path), filename=ch_path.name, type="chapter", title=chapter.title,
+        ))
+
+    # Combined m4b + mp3
     combined_label = _combined_label(selected_chapters, book_title, len(all_chapters))
     m4b_path = output_dir / _safe_filename(f"{combined_label}.m4b")
     mp3_path = output_dir / _safe_filename(f"{combined_label}.mp3")
-    
-    audio_builder.build_combined_mp3(chapter_files, mp3_path)
+
     audio_builder.build_m4b(chapter_files, m4b_path, book_title=book_title, book_author=book_author, cover_path=cover_path)
-    
-    for _, fpath in chapter_files:
-        fpath.unlink(missing_ok=True)
-    
+    output_files.append(OutputFile(path=str(m4b_path), filename=m4b_path.name, type="m4b"))
+
+    audio_builder.build_combined_mp3(chapter_files, mp3_path)
+    output_files.append(OutputFile(path=str(mp3_path), filename=mp3_path.name, type="mp3"))
+
+    # Persist conversion record
+    record = ConversionRecord(
+        selected_chapters=[ch.index for ch in selected_chapters],
+        output_files=output_files,
+    )
+    book.conversions.append(record)
+    converter.save_book(book)
+
     console.print("\n[bold green]✅ Conversion complete![/bold green]")
     console.print(f"\n[bold blue]📁 Output directory:[/bold blue] {output_dir.resolve()}")
     console.print(f"[bold blue]Files generated:[/bold blue]")
-    console.print(f"  • {m4b_path.name}")
-    console.print(f"  • {mp3_path.name}")
+    for of in output_files:
+        console.print(f"  • {of.filename}")
     console.print(f"\n[bold blue]Quick actions:[/bold blue]")
     console.print(f"  Open directory: [cyan]open {output_dir}[/cyan]")
 
@@ -318,38 +384,40 @@ def voice(command, name, provider, voice_id, language, gender):
 @click.argument("input_file", type=click.Path(exists=True))
 def chapters(input_file):
     input_path = Path(input_file)
-    parser = get_parser(str(input_path))
-    chapters = parser.get_chapters()
-    
+    book = _ensure_registered(input_path)
+    chapter_list = book.chapters
+
     console.print(f"\n[bold blue]📖 Chapters in {input_path.name}:[/bold blue]")
-    
+
     total_chars = 0
     total_duration = 0.0
-    
-    for i, chapter in enumerate(chapters):
+    max_num_width = len(str(len(chapter_list)))
+
+    for chapter in chapter_list:
         char_count = chapter.char_count or len(chapter.text) if chapter.text else 0
         total_chars += char_count
-        
+
         duration = chapter.estimated_duration_seconds / 60
         total_duration += duration
-        
+
         if duration < 1:
             time_str = f"~{int(chapter.estimated_duration_seconds)}s"
         else:
             time_str = f"~{int(duration)} min"
-        
-        console.print(f"\n[bold]{chapter.title}[/bold]")
-        console.print(f"  {char_count} chars · {time_str}")
-    
+
+        num = chapter.index + 1
+        console.print(f"\n[bold]{num:>{max_num_width}}. {chapter.title}[/bold]")
+        console.print(f"    {char_count} chars · {time_str}")
+
     if total_duration < 60:
         total_time_str = f"{total_duration:.1f} minutes"
     else:
         hours = int(total_duration // 60)
         mins = total_duration % 60
         total_time_str = f"{hours}h {mins:.1f}min"
-    
+
     console.print(f"\n[bold green]📊 Summary:[/bold green]")
-    console.print(f"  Total chapters: {len(chapters)}")
+    console.print(f"  Total chapters: {len(chapter_list)}")
     console.print(f"  Total characters: {total_chars:,}")
     console.print(f"  Estimated conversion time: {total_time_str}")
 
@@ -384,6 +452,32 @@ def list():
     console.print(f"\n[bold green]Total: {len(books)} books[/bold green]")
     console.print("\n[bold blue]Usage:[/bold blue]")
     console.print(f"  Convert to existing book: book2audio convert --book-id <BOOK_ID> input_file.epub")
+
+
+@library.command(help="Delete a book from the library by ID.")
+@click.argument("book_id")
+def delete(book_id):
+    import shutil
+    from core.converter import Converter
+
+    converter = Converter()
+    book = converter.get_book(book_id)
+    if not book:
+        console.print(f"[red]Book not found: {book_id}[/red]")
+        raise SystemExit(1)
+
+    # Remove upload directory
+    upload_dir = settings.upload_dir / book_id
+    if upload_dir.exists():
+        shutil.rmtree(upload_dir)
+
+    # Remove output directory
+    output_dir = settings.output_dir / book_id
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    converter.delete_book(book_id)
+    console.print(f"[green]Deleted: {book.title} ({book_id})[/green]")
 
 
 @cli.command(help="Start the web server to access the GUI interface.")

@@ -4,7 +4,6 @@ import re
 from pathlib import Path
 
 import pdfplumber
-import fitz  # PyMuPDF - faster text extraction
 from pdfminer.pdfparser import PDFParser as MinerParser
 from pdfminer.pdfdocument import PDFDocument
 from pdfminer.pdfpage import PDFPage
@@ -34,38 +33,19 @@ class PdfParser(BaseBookParser):
             return False
     
     def _pre_extract_all_text(self) -> None:
-        """Pre-extract text from all pages and cache it using PyMuPDF (faster)."""
+        """Pre-extract text from all pages and cache it."""
         log.info("PDF: Pre-extracting text from %d pages", len(self.pdf.pages))
-        try:
-            # Use PyMuPDF for faster text extraction
-            doc = fitz.open(self.file_path)
-            for page_num in range(len(doc)):
-                page = doc.load_page(page_num)
-                text = page.get_text()
-                if not text:
-                    self._page_text_cache[page_num] = ""
-                    continue
-                lines = text.split("\n")
-                filtered = [
-                    line for line in lines
-                    if not re.match(r"^\s*\d+\s*$", line)
-                ]
-                self._page_text_cache[page_num] = "\n".join(filtered)
-            doc.close()
-        except Exception as e:
-            log.warning("PyMuPDF extraction failed, falling back to pdfplumber: %s", e)
-            # Fallback to pdfplumber
-            for page_num, page in enumerate(self.pdf.pages):
-                text = page.extract_text(x_tolerance=2, y_tolerance=2)
-                if not text:
-                    self._page_text_cache[page_num] = ""
-                    continue
-                lines = text.split("\n")
-                filtered = [
-                    line for line in lines
-                    if not re.match(r"^\s*\d+\s*$", line)
-                ]
-                self._page_text_cache[page_num] = "\n".join(filtered)
+        for page_num, page in enumerate(self.pdf.pages):
+            text = page.extract_text(x_tolerance=2, y_tolerance=2)
+            if not text:
+                self._page_text_cache[page_num] = ""
+                continue
+            lines = text.split("\n")
+            filtered = [
+                line for line in lines
+                if not re.match(r"^\s*\d+\s*$", line)
+            ]
+            self._page_text_cache[page_num] = "\n".join(filtered)
 
     def get_metadata(self) -> BookMetadata:
         if not self.pdf:

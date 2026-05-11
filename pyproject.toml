@@ -1,8 +1,25 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel>=0.43.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "book-to-audiobook"
-version = "0.1.0"
-description = "Convert ebooks to audiobooks with chapter markers"
+version = "0.1.4"
+description = "Convert ebooks (EPUB, PDF, TXT) to audiobooks (M4B/MP3) with chapter markers"
+readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "hugcosmos", email = "hugcosmos@gmail.com" }]
+license = "MIT"
+keywords = ["audiobook", "ebook", "tts", "text-to-speech", "m4b", "epub", "pdf"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio",
+]
 dependencies = [
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.34.0",
@@ -27,9 +44,14 @@ dependencies = [
 [project.scripts]
 book2audio = "cli.main:cli"
 
-[build-system]
-requires = ["setuptools>=68.0"]
-build-backend = "setuptools.build_meta"
+[project.urls]
+Homepage = "https://github.com/hugcosmos/book-to-audiobook"
+Repository = "https://github.com/hugcosmos/book-to-audiobook"
+Issues = "https://github.com/hugcosmos/book-to-audiobook/issues"
 
 [tool.setuptools.packages.find]
 include = ["app*", "core*", "config*", "utils*", "cli*"]
+
+[tool.setuptools.package-data]
+"app" = ["templates/**/*", "static/**/*"]
+"config" = ["*.py"]

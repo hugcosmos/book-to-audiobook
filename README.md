@@ -11,11 +11,14 @@ Convert ebooks (EPUB, MOBI, AZW3, PDF, TXT) to audiobooks (M4B / MP3) with chapt
 ## Install
 
 ```bash
-# Clone the repository
+pip install book-to-audiobook
+```
+
+Or install from source:
+
+```bash
 git clone https://github.com/hugcosmos/book-to-audiobook.git
 cd book-to-audiobook
-
-# Install dependencies and the CLI tool
 pip install -e .
 ```
 
@@ -53,7 +56,7 @@ book2audio --help
 | `chapters` | Preview book chapters (shows char count and estimated time) |
 | `voice` | Manage voices (list/add/delete) |
 | `config` | Manage configuration (show/get/set/reset) |
-| `library` | Manage audiobook library (list books) |
+| `library` | Manage audiobook library (`list`, `delete`) |
 | `serve` | Start web server |
 
 #### Convert Options
@@ -66,7 +69,7 @@ book2audio --help
 | `-l, --language` | Language code (zh-CN, en-US, ja-JP, etc.) |
 | `-s, --speed` | Speech speed (0.5-2.0) |
 | `--model-path` | Local model path (for qwen3_mlx provider) |
-| `--book-id` | Add output to existing library book (shares directory with web app) |
+| `--book-id` | Convert using existing library book by ID (no INPUT_FILE needed) |
 
 #### CLI Examples
 
@@ -84,6 +87,9 @@ book2audio convert book.pdf -p edge-tts -v zh-CN-XiaoyiNeural -s 1.2
 book2audio convert book.epub -p qwen3_mlx --model-path ~/.cache/huggingface/hub/models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit
 
 # Add to existing library book (shares output with web app, preserves cover)
+book2audio convert --book-id a74e947e332e -c 11-20
+
+# Or provide file path (auto-registers if not in library)
 book2audio convert new_chapters.pdf --book-id a74e947e332e -c 11-20
 
 # Preview chapters (shows char count and estimated conversion time)
@@ -124,23 +130,25 @@ book2audio config set tts.provider edge-tts
 # 4. Set local model path to avoid repeated downloads (qwen3_mlx users)
 book2audio config set qwen3_mlx.model_path "~/.cache/huggingface/hub/models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
 
-# 5. Preview book chapters
+# 5. Preview book chapters (auto-registers book in library)
 book2audio chapters my_book.pdf
 
 # 6. Convert to audiobook
 book2audio convert my_book.pdf --chapters 1-10 --speed 1.2
 
 # 7. Find output files
-# Output saved to: output/my_book/audiobook.m4b and audiobook.mp3
+# Output saved to: output/{book_id}/ (check with: book2audio library list)
 ```
 
 #### CLI and Web App Integration
 
-CLI and Web app share the same configuration and output directory:
+CLI and Web app share the same library — books, metadata, and conversion records:
+- `chapters` and `convert` commands auto-register books into the shared library
 - Configuration: `config/user_settings.json`
-- Output directory: `output/`
-- Use `--book-id` flag to add CLI conversions to existing web app books
-- CLI conversions inherit book metadata (title, author, cover) when using `--book-id`
+- Book storage: `uploads/{book_id}/` with `meta.json`
+- Output: `output/{book_id}/` (per-chapter MP3s + combined M4B/MP3)
+- CLI conversions appear in Web, and vice versa
+- `--book-id` lets you convert without providing the file path again
 
 ### Workflow
 
