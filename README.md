@@ -8,6 +8,23 @@ Convert ebooks (EPUB, MOBI, AZW3, PDF, TXT) to audiobooks (M4B / MP3) with chapt
 - [FFmpeg](https://ffmpeg.org/) (required for audio processing)
 - [Calibre](https://calibre-ebook.com/) (optional, for MOBI/AZW3 support via `ebook-convert`)
 
+### Optional: MOBI/AZW3 Support
+
+MOBI/AZW3 formats require Calibre's `ebook-convert` command to convert to EPUB first.
+
+```bash
+# macOS
+brew install --cask calibre
+
+# Ubuntu/Debian
+sudo apt install calibre
+
+# Windows
+# Download from https://calibre-ebook.com
+```
+
+Verify: `ebook-convert --version`
+
 ## Install
 
 ```bash
