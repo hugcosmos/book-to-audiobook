@@ -84,7 +84,11 @@ class SettingsBody(BaseModel):
 
 @router.get("/api/settings")
 async def get_settings():
-    return get_user_settings_dict()
+    data = get_user_settings_dict()
+    data.setdefault("tts_default_provider", settings.tts.provider)
+    data.setdefault("tts_default_voice", settings.tts.default_voice)
+    data.setdefault("tts_default_language", settings.tts.default_language)
+    return data
 
 
 @router.post("/api/settings")

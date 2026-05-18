@@ -102,6 +102,18 @@ async function loadProviders() {
             opt.disabled = !p.configured;
             sel.appendChild(opt);
         });
+        // Respect user's configured default provider
+        try {
+            var defaultResp = await fetch('/api/settings');
+            var defaultData = await defaultResp.json();
+            var defaultProvider = defaultData.tts_default_provider
+                || (defaultData.tts && defaultData.tts.provider);
+            if (defaultProvider) {
+                sel.value = defaultProvider;
+            }
+        } catch (e2) {
+            console.error('Failed to load default provider:', e2);
+        }
         _currentProvider = sel.value;
     } catch (e) {
         console.error('Failed to load providers:', e);

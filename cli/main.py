@@ -521,6 +521,7 @@ def delete(book_id):
 @cli.command(help="Start the web server to access the GUI interface.")
 def serve():
     import uvicorn
+    console.print(f"\n[bold green]Starting server at http://localhost:{settings.port}[/bold green]\n")
     uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=True)
 
 
