@@ -74,7 +74,10 @@ async function loadDefaultSpeed() {
         var data = await resp.json();
         var provider = document.getElementById('provider').value;
         var speed = 1.0;
-        if (provider === 'qwen3_mlx' && data.qwen3_mlx && data.qwen3_mlx.speed != null) {
+        // Per-provider speed saved from convert page
+        if (data.convert_speed && data.convert_speed[provider] != null) {
+            speed = data.convert_speed[provider];
+        } else if (provider === 'qwen3_mlx' && data.qwen3_mlx && data.qwen3_mlx.speed != null) {
             speed = data.qwen3_mlx.speed;
         }
         var el = document.getElementById('speed');
@@ -86,6 +89,26 @@ async function loadDefaultSpeed() {
     } catch (e) {
         console.error('Failed to load default speed:', e);
     }
+}
+
+var _speedSaveTimer = null;
+function saveSpeed() {
+    if (_speedSaveTimer) clearTimeout(_speedSaveTimer);
+    _speedSaveTimer = setTimeout(function() {
+        var provider = document.getElementById('provider').value;
+        var speed = parseFloat(document.getElementById('speed').value);
+        fetch('/api/settings').then(function(r) { return r.json(); }).then(function(data) {
+            var speedMap = data.convert_speed || {};
+            speedMap[provider] = speed;
+            return fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ settings: { convert_speed: speedMap } }),
+            });
+        }).catch(function(e) {
+            console.error('Failed to save speed:', e);
+        });
+    }, 500);
 }
 
 async function loadProviders() {
