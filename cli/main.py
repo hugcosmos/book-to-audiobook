@@ -429,27 +429,29 @@ def chapters(input_file, book_id):
     max_num_width = len(str(len(chapter_list)))
 
     for chapter in chapter_list:
-        char_count = chapter.char_count or len(chapter.text) if chapter.text else 0
+        char_count = chapter.char_count if chapter.char_count else (len(chapter.text) if chapter.text else 0)
         total_chars += char_count
 
-        duration = chapter.estimated_duration_seconds / 60
-        total_duration += duration
+        total_duration += chapter.estimated_duration_seconds
 
-        if duration < 1:
-            time_str = f"~{int(chapter.estimated_duration_seconds)}s"
+        duration_min = chapter.estimated_duration_seconds / 60
+        if duration_min < 1:
+            time_str = f"~{max(1, round(duration_min * 60))}s"
         else:
-            time_str = f"~{int(duration)} min"
+            time_str = f"~{round(duration_min)} min"
 
         num = chapter.index + 1
         console.print(f"\n[bold]{num:>{max_num_width}}. {chapter.title}[/bold]")
-        console.print(f"    {char_count} chars · {time_str}")
+        console.print(f"    {char_count:,} chars · {time_str}")
 
     if total_duration < 60:
-        total_time_str = f"{total_duration:.1f} minutes"
+        total_time_str = f"{total_duration:.0f}s"
+    elif total_duration < 3600:
+        total_time_str = f"{total_duration / 60:.1f} min"
     else:
-        hours = int(total_duration // 60)
-        mins = total_duration % 60
-        total_time_str = f"{hours}h {mins:.1f}min"
+        hours = int(total_duration // 3600)
+        mins = (total_duration % 3600) / 60
+        total_time_str = f"{hours}h {mins:.0f}min"
 
     console.print(f"\n[bold green]📊 Summary:[/bold green]")
     console.print(f"  Total chapters: {len(chapter_list)}")

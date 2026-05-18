@@ -29,7 +29,7 @@
                     <label>
                         <input type="checkbox" name="chapters" value="{{ ch.index }}" checked>
                         <span class="ch-title">{{ ch.title }}</span>
-                        <span class="ch-meta">{{ ch.char_count }} chars &middot; ~{{ "%.0f" | format(ch.estimated_duration_seconds / 60) }} min</span>
+                        <span class="ch-meta">{{ ch.char_count }} chars &middot; ~{% if ch.estimated_duration_seconds / 60 >= 1 %}{{ "%.0f" | format(ch.estimated_duration_seconds / 60) }} min{% else %}{{ [1, ch.estimated_duration_seconds | round | int] | max }}s{% endif %}</span>
                     </label>
                 </li>
                 {% endfor %}
