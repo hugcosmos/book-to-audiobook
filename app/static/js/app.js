@@ -465,6 +465,10 @@ async function saveChapterText() {
 // --- Resume interrupted conversion ---
 
 async function resumeConvert(bookId) {
+    var chapter = document.getElementById('currentChapter');
+    if (chapter) chapter.textContent = 'Resuming conversion...';
+    var cancel = document.getElementById('cancelBtn');
+    if (cancel) cancel.classList.remove('hidden');
     try {
         var resp = await fetch('/api/convert/' + bookId + '/resume', { method: 'POST' });
         var data = await resp.json();

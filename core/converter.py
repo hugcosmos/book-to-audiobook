@@ -254,9 +254,10 @@ class Converter:
         status.state = "running"
         # Write manifest for crash recovery
         completed_indices = list(getattr(self, '_resume_completed', {}).pop(book_id, []))
+        all_selected = sorted(set(request.selected_chapters + completed_indices))
         manifest = ConversionManifest(
             book_id=book_id,
-            selected_chapters=request.selected_chapters,
+            selected_chapters=all_selected,
             completed_chapters=completed_indices,
             tts_provider=request.tts_provider,
             tts_config=request.tts_config,
@@ -264,6 +265,8 @@ class Converter:
             output_mp3=request.output_mp3,
         )
         self._write_manifest(manifest)
+        total_all = len(all_selected)
+        base_completed = len(completed_indices)
         try:
             book = self._books[book_id]
             selected = [ch for ch in book.chapters if ch.index in request.selected_chapters]
@@ -306,12 +309,12 @@ class Converter:
                 status.current_chapter = f"{chapter.title} (preparing...)"
 
                 # Progress callback: chapter base + chunk progress within chapter
-                def make_progress_cb(ch_idx, total_ch):
+                def make_progress_cb(ch_idx, total_ch, base_done, total_all_ch):
                     def cb(chunk_done, chunk_total):
                         if chunk_total <= 0:
                             return
                         chapter_frac = chunk_done / chunk_total
-                        overall = (ch_idx + chapter_frac) / total_ch * 100
+                        overall = (base_done + ch_idx + chapter_frac) / total_all_ch * 100
                         status.progress_percent = overall
                         status.current_chapter = (
                             f"{chapter.title} (chunk {chunk_done}/{chunk_total})"
@@ -325,12 +328,12 @@ class Converter:
                 temp_mp3 = out_dir / f"_tmp_{chapter.index:04d}.mp3"
                 log.info(f"Starting TTS synthesis to: {temp_mp3}")
                 cancel_check = lambda: self._cancel_flags.get(book_id, False)
-                await tts.synthesize(text, temp_mp3, progress=make_progress_cb(i, len(selected)), cancelled=cancel_check)
+                await tts.synthesize(text, temp_mp3, progress=make_progress_cb(i, len(selected), base_completed, total_all), cancelled=cancel_check)
                 named_mp3 = out_dir / self._safe_filename(f"{book.title} - {chapter.title}.mp3")
                 temp_mp3.rename(named_mp3)
                 chapter_files.append((chapter, named_mp3))
-                status.completed_chapters = i + 1
-                status.progress_percent = (i + 1) / len(selected) * 100
+                status.completed_chapters = base_completed + i + 1
+                status.progress_percent = (base_completed + i + 1) / total_all * 100
                 status.current_chapter = chapter.title
                 # Update manifest after each chapter
                 manifest.completed_chapters.append(chapter.index)

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "book-to-audiobook"
-version = "0.1.13"
+version = "0.1.14"
 description = "Convert ebooks (EPUB, PDF, TXT) to audiobooks (M4B/MP3) with chapter markers"
 readme = "README.md"
 requires-python = ">=3.11"
