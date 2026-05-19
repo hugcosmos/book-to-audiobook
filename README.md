@@ -5,25 +5,8 @@ Convert ebooks (EPUB, MOBI, AZW3, PDF, TXT) to audiobooks (M4B / MP3) with chapt
 ## Prerequisites
 
 - Python >= 3.11
-- [FFmpeg](https://ffmpeg.org/) (required for audio processing)
-- [Calibre](https://calibre-ebook.com/) (optional, for MOBI/AZW3 support via `ebook-convert`)
-
-### Optional: MOBI/AZW3 Support
-
-MOBI/AZW3 formats require Calibre's `ebook-convert` command to convert to EPUB first.
-
-```bash
-# macOS
-brew install --cask calibre
-
-# Ubuntu/Debian
-sudo apt install calibre
-
-# Windows
-# Download from https://calibre-ebook.com
-```
-
-Verify: `ebook-convert --version`
+- [FFmpeg](https://ffmpeg.org/)
+- [Calibre](https://calibre-ebook.com/) (optional, for MOBI/AZW3)
 
 ## Install
 
@@ -31,7 +14,7 @@ Verify: `ebook-convert --version`
 pip install book-to-audiobook
 ```
 
-Or install from source:
+From source:
 
 ```bash
 git clone https://github.com/hugcosmos/book-to-audiobook.git
@@ -39,269 +22,126 @@ cd book-to-audiobook
 pip install -e .
 ```
 
-## Usage
-
-### Web Interface
+## Quick Start
 
 ```bash
-# Start server
-./start.sh
+# Web UI
+book2audio serve                          # http://localhost:8000
 
-# Stop server
-./stop.sh
-
-# Or run directly
-python -m app.main
+# CLI
+book2audio chapters book.epub            # preview chapters
+book2audio convert book.epub -c 1-10     # convert chapters 1-10
+book2audio doc                            # full command reference
 ```
 
-Open http://localhost:8000 in your browser.
+## CLI Reference
 
-### Command Line Interface (CLI)
-
-After installation, the `book2audio` command is available system-wide:
-
-```bash
-# Verify installation
-book2audio --help
-```
-
-#### CLI Commands
+Run `book2audio doc` for detailed help, or `book2audio <command> --help`.
 
 | Command | Description |
 |---------|-------------|
 | `convert` | Convert ebook to audiobook |
-| `chapters` | Preview book chapters (shows char count and estimated time) |
+| `chapters` | List, view (`-t N`), and edit (`-e N`) chapters |
 | `voice` | Manage voices (list/add/delete) |
-| `config` | Manage configuration (show/get/set/reset) |
-| `library` | Manage audiobook library (`list`, `delete`) |
+| `config` | Manage configuration |
+| `library` | Manage audiobook library |
 | `serve` | Start web server |
+| `doc` | Show full documentation |
 
-#### Convert Options
-
-| Option | Description |
-|--------|-------------|
-| `-c, --chapters` | Chapter range (e.g., `1-5,7,10-` for chapters 1-5, 7, 10+) |
-| `-p, --provider` | TTS provider: `edge-tts`, `elevenlabs`, `baidu-tts`, `iflytek-tts`, `qwen3_mlx` |
-| `-v, --voice` | Voice name |
-| `-l, --language` | Language code (zh-CN, en-US, ja-JP, etc.) |
-| `-s, --speed` | Speech speed (0.5-2.0) |
-| `--model-path` | Local model path (for qwen3_mlx provider) |
-| `--book-id` | Convert using existing library book by ID (no INPUT_FILE needed) |
-
-#### CLI Examples
+### Convert
 
 ```bash
-# Convert entire book with default settings
-book2audio convert /path/to/book.pdf
-
-# Convert specific chapters
-book2audio convert book.epub -c 1-10
-
-# Use specific provider and voice
-book2audio convert book.pdf -p edge-tts -v zh-CN-XiaoyiNeural -s 1.2
-
-# Use local qwen3_mlx model (avoid repeated downloads)
-book2audio convert book.epub -p qwen3_mlx --model-path ~/.cache/huggingface/hub/models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit
-
-# Add to existing library book (shares output with web app, preserves cover)
+book2audio convert book.epub
+book2audio convert book.epub -c 1-10 -p edge-tts -v zh-CN-XiaoyiNeural -s 1.2
 book2audio convert --book-id a74e947e332e -c 11-20
-
-# Or provide file path (auto-registers if not in library)
-book2audio convert new_chapters.pdf --book-id a74e947e332e -c 11-20
-
-# Preview chapters (shows char count and estimated conversion time)
-book2audio chapters my_book.pdf
-
-# List available voices
-book2audio voice list
-
-# Add custom voice
-book2audio voice add --provider elevenlabs --voice-id "xxx" --name "My Voice" --language en-US
-
-# Configure settings
-book2audio config show
-book2audio config set tts.provider edge-tts
-book2audio config set qwen3_mlx.model_path "/path/to/local/model"
-
-# List library books (to get book_id)
-book2audio library list
-
-# Start web server
-book2audio serve
+book2audio convert book.pdf -p qwen3_mlx -l en-US
 ```
 
-#### CLI Quick Start Example
+### Chapters
 
 ```bash
-# 1. Clone and install
-git clone https://github.com/hugcosmos/book-to-audiobook.git
-cd book-to-audiobook
-pip install -e .
-
-# 2. Check available voices
-book2audio voice list
-
-# 3. Configure default provider (optional)
-book2audio config set tts.provider edge-tts
-
-# 4. Set local model path to avoid repeated downloads (qwen3_mlx users)
-book2audio config set qwen3_mlx.model_path "~/.cache/huggingface/hub/models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
-
-# 5. Preview book chapters (auto-registers book in library)
-book2audio chapters my_book.pdf
-
-# 6. Convert to audiobook
-book2audio convert my_book.pdf --chapters 1-10 --speed 1.2
-
-# 7. Find output files
-# Output saved to: output/{book_id}/ (check with: book2audio library list)
+book2audio chapters book.epub                    # list chapters
+book2audio chapters book.epub -t 3               # view chapter 3 text
+book2audio chapters book.epub -t 3 --head 20     # first 20 lines only
+book2audio chapters book.epub -e 3               # edit chapter 3 in $EDITOR
+book2audio chapters --book-id abc123 -e 3-5      # edit chapters 3-5
 ```
 
-#### CLI and Web App Integration
+Edited text is saved separately (original never modified). Conversion uses edited text automatically. Edited chapters show `[edited]` tag.
 
-CLI and Web app share the same library — books, metadata, and conversion records:
-- `chapters` and `convert` commands auto-register books into the shared library
-- Configuration: `config/user_settings.json`
-- Book storage: `uploads/{book_id}/` with `meta.json`
-- Output: `output/{book_id}/` (per-chapter MP3s + combined M4B/MP3)
-- CLI conversions appear in Web, and vice versa
-- `--book-id` lets you convert without providing the file path again
+## Web UI
 
-### Workflow
+Open http://localhost:8000. Drag & drop ebooks, select chapters, configure TTS, convert. Chapter text can be edited inline via the edit button on each chapter.
 
-#### Web Interface
-1. **Upload** — Drag & drop an ebook on the library page
-2. **Select chapters** — Click the book card, pick chapters to convert
-3. **Configure TTS** — Choose provider, language, voice, speed
-4. **Convert** — Progress shows inline, no page navigation
-5. **Download** — Files appear in Generated Files after completion
-
-#### Command Line
-1. **Preview** — `book2audio chapters /path/to/book.pdf`
-2. **Configure** — `book2audio config set tts.provider edge-tts` (optional)
-3. **Convert** — `book2audio convert /path/to/book.pdf -c 1-10`
-4. **Locate** — Output files saved to `output/` directory
-
-Conversions are saved — restart the server and all books/history remain unless you delete them.
-
+CLI and Web share the same library — books, edits, and conversion records persist across both.
 
 ## TTS Providers
 
-### Cloud Providers (require API keys)
+### Cloud
 
-| Provider | Env Variables | Description |
-|----------|--------------|-------------|
-| **Edge TTS** | None needed | Microsoft Edge online TTS. Free, no API key.  |
-| **ElevenLabs** | `B2A_ELEVENLABS__API_KEY` | High-quality multilingual TTS. Get key at [elevenlabs.io](https://elevenlabs.io). |
-| **Baidu TTS** | `B2A_BAIDU_TTS__API_KEY`, `B2A_BAIDU_TTS__SECRET_KEY` | Baidu speech synthesis. Get credentials at [cloud.baidu.com](https://cloud.baidu.com). |
-| **iFlytek TTS** | `B2A_IFLYTEK_TTS__APP_ID`, `B2A_IFLYTEK_TTS__API_KEY`, `B2A_IFLYTEK_TTS__API_SECRET` | iFlytek speech synthesis. Get credentials at [xfyun.cn](https://xfyun.cn). |
+| Provider | Setup | Cost |
+|----------|-------|------|
+| **Edge TTS** | No config needed | Free |
+| **ElevenLabs** | `B2A_ELEVENLABS__API_KEY` | Paid |
+| **Baidu TTS** | `B2A_BAIDU_TTS__API_KEY` + `B2A_BAIDU_TTS__SECRET_KEY` | Paid |
+| **iFlytek TTS** | `B2A_IFLYTEK_TTS__APP_ID` + `B2A_IFLYTEK_TTS__API_KEY` + `B2A_IFLYTEK_TTS__API_SECRET` | Paid |
 
-### Local Models (no API key needed)
+### Local — Qwen3 TTS via MLX (Apple Silicon)
 
-#### Qwen3 TTS via MLX — Apple Silicon
-
-Runs entirely on-device. Requires Apple Silicon Mac (M1/M2/M3/M4).
+On-device, no API key. Requires Apple Silicon Mac (M1+).
 
 ```bash
-# Faster model downloads (parallel transfer)
 pip install hf-transfer
-
-# China users: use HuggingFace mirror for faster downloads
-export HF_ENDPOINT=https://hf-mirror.com
-
-# Enable parallel downloads
 export HF_HUB_ENABLE_HF_TRANSFER=1
+# China users: export HF_ENDPOINT=https://hf-mirror.com
 ```
 
-Available models (configured in Settings page or `config/user_settings.json`):
+| Model | Size | Quality | Memory |
+|-------|------|---------|--------|
+| `0.6B-CustomVoice-8bit` | Default | Good | ~0.6GB |
+| `1.7B-CustomVoice-4bit` | Larger | Great | ~0.85GB |
+| `1.7B-CustomVoice-8bit` | Larger | Great | ~1.7GB |
 
-| Model | Quantization | Quality | Speed | Memory |
-|-------|-------------|---------|-------|--------|
-| `0.6B-CustomVoice-4bit` | 4-bit | Good | Fastest | ~0.3GB |
-| `0.6B-CustomVoice-8bit` | 8-bit | Good | Fast | ~0.6GB |
-| `1.7B-CustomVoice-4bit` | 4-bit | Great | Fast | ~0.85GB |
-| `1.7B-CustomVoice-8bit` | 8-bit | Great | Fast | ~1.7GB |
-| `1.7B-CustomVoice-bf16` | bf16 | Best | Slower | ~3.4GB |
+Set via Settings page or `book2audio config set qwen3_mlx.model_name <model>`.
 
-Set model in `config/user_settings.json`:
+## Supported Languages
 
-```json
-{
-  "qwen3_mlx": {
-    "model_name": "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit",
-    "speed": 1.2
-  }
-}
-```
+Chinese (zh-CN/TW/HK), English (US/UK), Japanese, Korean, French, German, Spanish, Russian, Portuguese, Italian.
 
 ## Configuration
 
-All settings use the `B2A_` env prefix:
+Environment variables with `B2A_` prefix, or `book2audio config set`:
+
+```bash
+book2audio config show
+book2audio config set tts.provider edge-tts
+book2audio config set qwen3_mlx.speed 1.2
+```
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `B2A_HOST` | `0.0.0.0` | Server bind address |
 | `B2A_PORT` | `8000` | Server port |
-| `B2A_UPLOAD_DIR` | `uploads` | Uploaded ebook storage |
-| `B2A_OUTPUT_DIR` | `output` | Generated audio output |
-| `B2A_MAX_UPLOAD_SIZE_MB` | `500` | Max upload file size |
-| `B2A_FFMPEG_PATH` | `ffmpeg` | Path to ffmpeg binary |
-| `B2A_FFPROBE_PATH` | `ffprobe` | Path to ffprobe binary |
-
-Set via environment variables or `.env` file:
-
-```bash
-export B2A_PORT=8000
-./start.sh
-```
-
-## Supported Languages
-
-Chinese, English (US/UK), Japanese, Korean, French, German, Spanish, Russian.
+| `B2A_UPLOAD_DIR` | `uploads` | Ebook storage |
+| `B2A_OUTPUT_DIR` | `output` | Audio output |
 
 ## Project Structure
 
 ```
-app/               # FastAPI web app
-  main.py          # Entry point
-  routes/          # HTTP routes
-  templates/       # Jinja2 HTML templates
-  static/          # CSS + JS
-cli/               # Command Line Interface
-  main.py          # CLI entry point with click commands
-core/              # Core logic
-  converter.py     # Conversion orchestrator + state persistence
-  models.py        # Pydantic data models
-  book_parser/     # EPUB, MOBI, PDF, TXT parsers
-  tts_provider/    # TTS providers (Edge, Baidu, iFlytek, ElevenLabs, Qwen3 MLX)
-  audio_builder/   # FFmpeg audio assembly (M4B/MP3)
-  text_processor/  # Text cleaning + chunking
-config/            # Settings (pydantic-settings)
-uploads/           # Uploaded ebooks + meta.json state files
+app/               # FastAPI web app (routes, templates, static)
+cli/               # Click CLI commands
+core/              # converter, models, parsers, TTS providers, audio builder
+config/            # Settings (pydantic-settings) + user_settings.json
+uploads/           # Uploaded ebooks + chapter edits + meta.json
 output/            # Generated audiobook files
 ```
 
-## Dependencies & Licensing
+## Disclaimer
 
-All dependencies use permissive licenses compatible with MIT:
+**Edge TTS**: This project includes [edge-tts](https://github.com/rany2/edge-tts) as one TTS provider, which connects to Microsoft Edge's online text-to-speech service. This is not an official Microsoft API and may violate Microsoft's Terms of Service.
 
-| License | Packages |
-|---------|----------|
-| MIT | fastapi, pydantic, pydantic-settings, beautifulsoup4, pdfplumber, pydub, sentencex, mlx-audio |
-| BSD-3-Clause | uvicorn, jinja2, lxml, httpx, websockets, soundfile |
-| Apache-2.0 | python-multipart, aiofiles, hf-transfer |
-| LGPL-3.0 | edge-tts |
-
-EPUB parsing uses a built-in parser (zipfile + lxml) — no ebooklib dependency.
+Users can choose alternative providers (ElevenLabs, Baidu, iFlytek, or local Qwen3 MLX) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
 
 ## License
 
 MIT — see [LICENSE](LICENSE).
-
-## Disclaimer
-
-**Edge TTS**: This project includes [edge-tts](https://github.com/rany2/edge-tts) as one TTS provider, which connects to Microsoft Edge's online text-to-speech service. This is not an official Microsoft API and may violate Microsoft's Terms of Service. 
-
-**Alternative Providers**: Users can choose alternative TTS providers (ElevenLabs, Baidu TTS, iFlytek TTS, or local Qwen3 MLX models) to avoid using Edge TTS. See the [TTS Providers](#tts-providers) section for configuration details.
-
-**Use at your own risk**: The authors are not responsible for any violations of third-party terms of service.

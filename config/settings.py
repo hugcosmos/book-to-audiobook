@@ -55,7 +55,7 @@ class ElevenLabsSettings(BaseModel):
 class Qwen3MLXSettings(BaseModel):
     """Qwen3 TTS via MLX — Apple Silicon optimized."""
 
-    model_name: str = "mlx-community/Qwen3-TTS-12Hz-1.7B-CustomVoice-8bit"
+    model_name: str = "mlx-community/Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit"
     model_path: str | None = None  # Local model path (if set, overrides model_name)
     chunk_max_seconds: int = 90  # Target max audio duration per chunk; chars derived from language
     speed: float = 1.0  # speech speed via FFmpeg atempo (1.0=normal, 1.5=50% faster, 2.0=2x)

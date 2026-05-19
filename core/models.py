@@ -20,6 +20,7 @@ class Chapter(BaseModel):
     text: str = ""
     char_count: int = 0
     estimated_duration_seconds: float = 0.0
+    edited: bool = False
 
 
 class OutputFile(BaseModel):
@@ -65,10 +66,21 @@ class ConversionRequest(BaseModel):
 
 class ConversionStatus(BaseModel):
     book_id: str
-    state: str = "pending"  # pending | running | completed | failed | cancelled
+    state: str = "pending"  # pending | running | completed | failed | cancelled | resumable
     total_chapters: int = 0
     completed_chapters: int = 0
     current_chapter: str | None = None
     progress_percent: float = 0.0
     error_message: str | None = None
     output_files: list[OutputFile] = Field(default_factory=list)
+
+
+class ConversionManifest(BaseModel):
+    book_id: str
+    selected_chapters: list[int]
+    completed_chapters: list[int] = Field(default_factory=list)
+    tts_provider: str | None = None
+    tts_config: TTSConfig = Field(default_factory=TTSConfig)
+    output_m4b: bool = True
+    output_mp3: bool = True
+    state: str = "running"  # running | completed | failed

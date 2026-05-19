@@ -59,8 +59,37 @@ async def get_status(book_id: str):
     converter = app.state.converter
     status = converter.get_status(book_id)
     if not status:
+        # Check for resumable manifest
+        resumable = converter.get_resumable()
+        for r in resumable:
+            if r["book_id"] == book_id:
+                return ConversionStatus(
+                    book_id=book_id,
+                    state="resumable",
+                    total_chapters=r["total"],
+                    completed_chapters=r["completed"],
+                    progress_percent=r["progress_percent"],
+                ).model_dump()
         return ConversionStatus(book_id=book_id, state="lost").model_dump()
     return status.model_dump()
+
+
+@router.get("/api/convert/resumable")
+async def list_resumable():
+    from app.main import app
+    converter = app.state.converter
+    return converter.get_resumable()
+
+
+@router.post("/api/convert/{book_id}/resume")
+async def resume_convert(book_id: str):
+    from app.main import app
+    converter = app.state.converter
+    try:
+        converter.resume_conversion(book_id)
+        return {"book_id": book_id, "status": "resumed"}
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @router.post("/api/convert/{book_id}/cancel")

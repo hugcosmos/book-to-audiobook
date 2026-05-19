@@ -28,9 +28,10 @@
                 <li class="chapter-item" data-index="{{ ch.index }}">
                     <label>
                         <input type="checkbox" name="chapters" value="{{ ch.index }}" checked>
-                        <span class="ch-title">{{ ch.title }}</span>
+                        <span class="ch-title">{{ ch.title }}{% if ch.edited %} <span class="ch-edited-badge">edited</span>{% endif %}</span>
                         <span class="ch-meta">{{ ch.char_count }} chars &middot; ~{% if ch.estimated_duration_seconds / 60 >= 1 %}{{ "%.0f" | format(ch.estimated_duration_seconds / 60) }} min{% else %}{{ [1, ch.estimated_duration_seconds | round | int] | max }}s{% endif %}</span>
                     </label>
+                    <button class="btn-edit-chapter" onclick="openChapterEditor('{{ book.id }}', {{ ch.index }})" title="Edit chapter text">&#9998;</button>
                 </li>
                 {% endfor %}
             </ul>
@@ -124,9 +125,24 @@
         </div>
     </div>
 </div>
+
+<!-- Chapter text editor modal -->
+<div class="chapter-editor-overlay" id="chapterEditorOverlay" onclick="if(event.target===this)closeChapterEditor()">
+    <div class="chapter-editor-modal">
+        <div class="chapter-editor-header">
+            <h3 id="chapterEditorTitle">Edit Chapter</h3>
+            <button class="btn btn-sm" onclick="closeChapterEditor()">&times; Close</button>
+        </div>
+        <textarea id="chapterEditorTextarea" class="chapter-editor-textarea"></textarea>
+        <div class="chapter-editor-footer">
+            <span id="chapterEditorCharCount"></span>
+            <button class="btn btn-primary" id="chapterEditorSaveBtn" onclick="saveChapterText()">Save</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/app.js?v=4"></script>
+<script src="/static/js/app.js?v=6"></script>
 <script>
 var bookId = '{{ book.id }}';
 initTTSUI();

@@ -7,6 +7,7 @@ from pathlib import Path
 from core.audio_builder import AudioBuilder
 from core.models import (
     BookMetadata,
+    ConversionManifest,
     ConversionRecord,
     ConversionRequest,
     ConversionStatus,
@@ -25,6 +26,7 @@ class Converter:
         self._jobs: dict[str, ConversionStatus] = {}
         self._cancel_flags: dict[str, bool] = {}
         self._tasks: dict[str, asyncio.Task] = {}
+        self._resumable: dict[str, ConversionManifest] = {}
         self._load_books()
 
     def _load_books(self) -> None:
@@ -44,10 +46,18 @@ class Converter:
                 if book.file_path and not Path(book.file_path).exists():
                     log.warning("Book file missing for %s: %s, skipping", book.id, book.file_path)
                     continue
+                # Mark chapters with edited text files on disk
+                chapters_dir = book_dir / "chapters"
+                if chapters_dir.exists():
+                    for ch in book.chapters:
+                        if (chapters_dir / f"{ch.index}.txt").exists():
+                            ch.edited = True
                 self._books[book.id] = book
                 log.info("Loaded book from disk: %s (%s)", book.title, book.id)
             except Exception as e:
                 log.warning("Failed to load %s: %s", meta_path, e)
+        # Scan for resumable conversions
+        self._scan_resumable()
 
     def _save_book(self, book: BookMetadata) -> None:
         book_dir = settings.upload_dir / book.id
@@ -71,6 +81,52 @@ class Converter:
     def save_book(self, book: BookMetadata) -> None:
         self._save_book(book)
 
+    def get_chapter_text(self, book_id: str, chapter_index: int) -> str | None:
+        book = self._books.get(book_id)
+        if not book:
+            return None
+        chapter = next((ch for ch in book.chapters if ch.index == chapter_index), None)
+        if not chapter:
+            return None
+        # Priority: disk file → in-memory → re-parse
+        text_path = settings.upload_dir / book_id / "chapters" / f"{chapter_index}.txt"
+        if text_path.exists():
+            return text_path.read_text(encoding="utf-8")
+        if chapter.text:
+            return chapter.text
+        # Re-parse from original file
+        try:
+            from core.book_parser.parser_factory import get_parser
+            parser = get_parser(book.file_path)
+            for ch in parser.get_chapters():
+                if ch.index == chapter_index:
+                    return ch.text
+        except Exception as e:
+            log.error("Failed to re-parse chapter %d: %s", chapter_index, e)
+        return None
+
+    def save_chapter_text(self, book_id: str, chapter_index: int, text: str) -> bool:
+        book = self._books.get(book_id)
+        if not book:
+            return False
+        chapter = next((ch for ch in book.chapters if ch.index == chapter_index), None)
+        if not chapter:
+            return False
+        # Write to disk
+        chapters_dir = settings.upload_dir / book_id / "chapters"
+        chapters_dir.mkdir(parents=True, exist_ok=True)
+        text_path = chapters_dir / f"{chapter_index}.txt"
+        text_path.write_text(text, encoding="utf-8")
+        # Update in-memory metadata
+        chapter.edited = True
+        chapter.char_count = len(text)
+        from core.text_processor import TextProcessor
+        cleaned = TextProcessor.clean(text)
+        chars_per_second = 4.0
+        chapter.estimated_duration_seconds = len(cleaned) / chars_per_second
+        self._save_book(book)
+        return True
+
     def get_book(self, book_id: str) -> BookMetadata | None:
         book = self._books.get(book_id)
         if book:
@@ -93,6 +149,90 @@ class Converter:
         if task and not task.done():
             task.cancel()
 
+    def _manifest_path(self, book_id: str) -> Path:
+        return settings.output_dir / book_id / "_conversion.json"
+
+    def _write_manifest(self, manifest: ConversionManifest) -> None:
+        path = self._manifest_path(manifest.book_id)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+
+    def _load_manifest(self, book_id: str) -> ConversionManifest | None:
+        path = self._manifest_path(book_id)
+        if not path.exists():
+            return None
+        try:
+            return ConversionManifest.model_validate_json(path.read_text(encoding="utf-8"))
+        except Exception as e:
+            log.warning("Failed to load manifest for %s: %s", book_id, e)
+            return None
+
+    def _scan_resumable(self) -> None:
+        output_dir = settings.output_dir
+        if not output_dir.exists():
+            return
+        for manifest_path in output_dir.glob("*/_conversion.json"):
+            try:
+                manifest = ConversionManifest.model_validate_json(
+                    manifest_path.read_text(encoding="utf-8")
+                )
+                if manifest.state == "running" and manifest.book_id in self._books:
+                    self._resumable[manifest.book_id] = manifest
+                    log.info(
+                        "Resumable conversion found: %s (%d/%d chapters done)",
+                        manifest.book_id,
+                        len(manifest.completed_chapters),
+                        len(manifest.selected_chapters),
+                    )
+            except Exception as e:
+                log.warning("Failed to scan manifest %s: %s", manifest_path, e)
+
+    def get_resumable(self) -> list[dict]:
+        result = []
+        for book_id, manifest in self._resumable.items():
+            book = self._books.get(book_id)
+            if not book:
+                continue
+            done = len(manifest.completed_chapters)
+            total = len(manifest.selected_chapters)
+            result.append({
+                "book_id": book_id,
+                "book_title": book.title,
+                "completed": done,
+                "total": total,
+                "progress_percent": round(done / total * 100, 1) if total else 0,
+            })
+        return result
+
+    def resume_conversion(self, book_id: str) -> str:
+        manifest = self._resumable.pop(book_id, None)
+        if not manifest:
+            raise ValueError(f"No resumable conversion for {book_id}")
+        book = self._books.get(book_id)
+        if not book:
+            raise ValueError(f"Book not found: {book_id}")
+        remaining = [i for i in manifest.selected_chapters if i not in manifest.completed_chapters]
+        if not remaining:
+            raise ValueError("All chapters already completed")
+        request = ConversionRequest(
+            book_id=book_id,
+            selected_chapters=remaining,
+            tts_config=manifest.tts_config,
+            tts_provider=manifest.tts_provider,
+            output_m4b=manifest.output_m4b,
+            output_mp3=manifest.output_mp3,
+        )
+        # Pre-populate completed count for accurate progress
+        job_id = self.start_conversion(request)
+        status = self._jobs[job_id]
+        status.completed_chapters = len(manifest.completed_chapters)
+        status.total_chapters = len(manifest.selected_chapters)
+        status.progress_percent = status.completed_chapters / status.total_chapters * 100
+        # Store completed indices for manifest tracking in _run_conversion
+        self._resume_completed = getattr(self, '_resume_completed', {})
+        self._resume_completed[book_id] = manifest.completed_chapters
+        return job_id
+
     def start_conversion(self, request: ConversionRequest) -> str:
         book_id = request.book_id
         if book_id not in self._books:
@@ -112,6 +252,18 @@ class Converter:
         book_id = request.book_id
         status = self._jobs[book_id]
         status.state = "running"
+        # Write manifest for crash recovery
+        completed_indices = list(getattr(self, '_resume_completed', {}).pop(book_id, []))
+        manifest = ConversionManifest(
+            book_id=book_id,
+            selected_chapters=request.selected_chapters,
+            completed_chapters=completed_indices,
+            tts_provider=request.tts_provider,
+            tts_config=request.tts_config,
+            output_m4b=request.output_m4b,
+            output_mp3=request.output_mp3,
+        )
+        self._write_manifest(manifest)
         try:
             book = self._books[book_id]
             selected = [ch for ch in book.chapters if ch.index in request.selected_chapters]
@@ -134,13 +286,18 @@ class Converter:
                 log.info(f"Processing chapter {i+1}: {chapter.title} (index: {chapter.index})")
                 
                 if not chapter.text:
-                    log.info(f"Chapter text is empty, reloading from file...")
-                    all_chapters = parser.get_chapters()
-                    for ch in all_chapters:
-                        if ch.index == chapter.index:
-                            chapter.text = ch.text
-                            log.info(f"Reloaded text length: {len(chapter.text) if chapter.text else 0}")
-                            break
+                    text_path = settings.upload_dir / book_id / "chapters" / f"{chapter.index}.txt"
+                    if text_path.exists():
+                        chapter.text = text_path.read_text(encoding="utf-8")
+                        log.info(f"Loaded edited text from disk, length: {len(chapter.text)}")
+                    else:
+                        log.info(f"Chapter text is empty, reloading from file...")
+                        all_chapters = parser.get_chapters()
+                        for ch in all_chapters:
+                            if ch.index == chapter.index:
+                                chapter.text = ch.text
+                                log.info(f"Reloaded text length: {len(chapter.text) if chapter.text else 0}")
+                                break
                 
                 text = TextProcessor.clean(chapter.text)
                 log.info(f"Cleaned text length: {len(text)}")
@@ -175,6 +332,9 @@ class Converter:
                 status.completed_chapters = i + 1
                 status.progress_percent = (i + 1) / len(selected) * 100
                 status.current_chapter = chapter.title
+                # Update manifest after each chapter
+                manifest.completed_chapters.append(chapter.index)
+                self._write_manifest(manifest)
                 log.info(
                     "Chapter %d/%d done: %s",
                     i + 1, len(selected), chapter.title,
@@ -211,6 +371,8 @@ class Converter:
             status.state = "completed"
             status.output_files = output_files
             status.progress_percent = 100.0
+            manifest.state = "completed"
+            self._write_manifest(manifest)
             # Persist conversion record
             record = ConversionRecord(
                 selected_chapters=request.selected_chapters,
@@ -226,6 +388,8 @@ class Converter:
             log.error("Conversion failed: %s", e, exc_info=True)
             status.state = "failed"
             status.error_message = str(e)
+            manifest.state = "failed"
+            self._write_manifest(manifest)
 
     @staticmethod
     def _safe_filename(name: str) -> str:

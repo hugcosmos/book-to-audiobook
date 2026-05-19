@@ -256,9 +256,20 @@ async function pollStatus(bookId) {
 
         if (data.state === 'lost') {
             clearInterval(_pollTimer);
-            chapter.textContent = 'Server restarted \u2014 conversion state lost. Please start a new conversion.';
+            chapter.textContent = 'Server restarted \u2014 conversion state lost.';
             cancel.classList.add('hidden');
             hideProgress();
+            return;
+        }
+
+        if (data.state === 'resumable') {
+            clearInterval(_pollTimer);
+            showProgress();
+            var pct = data.progress_percent.toFixed(1) + '%';
+            fill.style.width = pct;
+            text.textContent = pct + ' \u2014 chapter ' + data.completed_chapters + '/' + data.total_chapters;
+            chapter.innerHTML = 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+            cancel.classList.add('hidden');
             return;
         }
 
@@ -355,5 +366,111 @@ async function previewVoice() {
         alert('Preview error: ' + e.message);
         btn.disabled = false;
         btn.textContent = '\u25B6 Preview Voice';
+    }
+}
+
+// --- Chapter text editor ---
+
+async function openChapterEditor(bookId, chapterIndex) {
+    var overlay = document.getElementById('chapterEditorOverlay');
+    var textarea = document.getElementById('chapterEditorTextarea');
+    var title = document.getElementById('chapterEditorTitle');
+    var charCount = document.getElementById('chapterEditorCharCount');
+    var saveBtn = document.getElementById('chapterEditorSaveBtn');
+
+    // Find chapter title from DOM
+    var item = document.querySelector('.chapter-item[data-index="' + chapterIndex + '"]');
+    var chTitle = item ? item.querySelector('.ch-title').textContent.replace('edited', '').trim() : 'Chapter ' + chapterIndex;
+    title.textContent = 'Edit: ' + chTitle;
+    textarea.value = 'Loading...';
+    textarea.disabled = true;
+    saveBtn.disabled = true;
+    overlay.classList.add('active');
+
+    overlay._bookId = bookId;
+    overlay._chapterIndex = chapterIndex;
+
+    try {
+        var resp = await fetch('/api/books/' + bookId + '/chapters/' + chapterIndex + '/text');
+        if (!resp.ok) throw new Error('Failed to load chapter text');
+        var data = await resp.json();
+        textarea.value = data.text;
+        charCount.textContent = data.text.length + ' chars';
+        textarea.disabled = false;
+        saveBtn.disabled = false;
+    } catch (e) {
+        textarea.value = 'Error: ' + e.message;
+    }
+
+    textarea.oninput = function() {
+        charCount.textContent = textarea.value.length + ' chars';
+    };
+}
+
+function closeChapterEditor() {
+    var overlay = document.getElementById('chapterEditorOverlay');
+    overlay.classList.remove('active');
+    overlay._bookId = null;
+    overlay._chapterIndex = null;
+}
+
+async function saveChapterText() {
+    var overlay = document.getElementById('chapterEditorOverlay');
+    var textarea = document.getElementById('chapterEditorTextarea');
+    var saveBtn = document.getElementById('chapterEditorSaveBtn');
+    var charCountEl = document.getElementById('chapterEditorCharCount');
+    var bookId = overlay._bookId;
+    var chapterIndex = overlay._chapterIndex;
+    if (!bookId || chapterIndex == null) return;
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving...';
+
+    try {
+        var resp = await fetch('/api/books/' + bookId + '/chapters/' + chapterIndex + '/text', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text: textarea.value }),
+        });
+        if (!resp.ok) throw new Error('Failed to save');
+        var data = await resp.json();
+
+        // Update DOM: char_count and duration
+        var item = document.querySelector('.chapter-item[data-index="' + chapterIndex + '"]');
+        if (item) {
+            var metaEl = item.querySelector('.ch-meta');
+            var dur = data.estimated_duration_seconds;
+            var durStr = dur / 60 >= 1 ? Math.round(dur / 60) + ' min' : Math.max(1, Math.round(dur)) + 's';
+            metaEl.textContent = data.char_count + ' chars \u00b7 ~' + durStr;
+            // Add edited badge if not present
+            var titleEl = item.querySelector('.ch-title');
+            if (!titleEl.querySelector('.ch-edited-badge')) {
+                var badge = document.createElement('span');
+                badge.className = 'ch-edited-badge';
+                badge.textContent = 'edited';
+                titleEl.appendChild(document.createTextNode(' '));
+                titleEl.appendChild(badge);
+            }
+        }
+        charCountEl.textContent = data.char_count + ' chars';
+        saveBtn.textContent = 'Saved!';
+        setTimeout(function() { saveBtn.textContent = 'Save'; saveBtn.disabled = false; }, 1000);
+    } catch (e) {
+        alert('Error: ' + e.message);
+        saveBtn.textContent = 'Save';
+        saveBtn.disabled = false;
+    }
+}
+
+// --- Resume interrupted conversion ---
+
+async function resumeConvert(bookId) {
+    try {
+        var resp = await fetch('/api/convert/' + bookId + '/resume', { method: 'POST' });
+        var data = await resp.json();
+        if (!resp.ok) throw new Error(data.detail || 'Resume failed');
+        startPolling(bookId);
+    } catch (e) {
+        alert('Resume error: ' + e.message);
     }
 }

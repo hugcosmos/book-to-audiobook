@@ -8,7 +8,9 @@ from pathlib import Path
 
 import click
 from rich.console import Console
+from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.text import Text
 
 from config.settings import settings
 from config.user_settings import get_user_settings_dict, load_user_settings
@@ -40,6 +42,42 @@ def _combined_label(selected: list, book_title: str, total_chapters: int) -> str
     if is_contiguous:
         return f"{book_title} - {selected[0].title}~{selected[-1].title}"
     return f"{book_title} - {selected[0].title}等{n}章"
+
+
+def _format_duration(seconds: float) -> str:
+    if seconds < 60:
+        return f"{max(1, round(seconds))}s"
+    if seconds < 3600:
+        return f"{round(seconds / 60)} min"
+    hours = int(seconds // 3600)
+    mins = (seconds % 3600) / 60
+    return f"{hours}h {mins:.0f}min"
+
+
+def _resolve_book(input_file, book_id):
+    """Resolve book from either input_file or book_id. Returns (book, converter)."""
+    from core.converter import Converter
+
+    if not input_file and not book_id:
+        console.print("[red]Error: Provide INPUT_FILE or --book-id[/red]")
+        raise SystemExit(1)
+
+    if input_file and book_id:
+        console.print("[red]Error: Provide INPUT_FILE or --book-id, not both[/red]")
+        raise SystemExit(1)
+
+    converter = Converter()
+
+    if book_id:
+        book = converter.get_book(book_id)
+        if not book:
+            console.print(f"[red]Book not found: {book_id}[/red]")
+            raise SystemExit(1)
+        return book, converter
+
+    input_path = Path(input_file)
+    book, _ = _ensure_registered(input_path)
+    return book, converter
 
 
 def _ensure_registered(input_path: Path) -> tuple[BookMetadata, dict[int, str]]:
@@ -89,55 +127,38 @@ def _ensure_registered(input_path: Path) -> tuple[BookMetadata, dict[int, str]]:
     return metadata, text_map
 
 
+# ── CLI Group ──────────────────────────────────────────────────────────
+
 @click.group()
 @click.version_option(version=importlib.metadata.version("book-to-audiobook"))
 def cli():
+    """book2audio — Convert ebooks to audiobooks with TTS."""
     pass
 
 
+# ── convert ────────────────────────────────────────────────────────────
+
 @cli.command(help="""Convert an ebook to audiobook.
 
-Supported formats:
-  - EPUB, PDF, TXT: Always supported
-  - MOBI, AZW3: Require Calibre (ebook-convert) to be installed
+Supported formats: EPUB, PDF, TXT (always), MOBI/AZW3 (needs Calibre).
 
-INPUT_FILE: Path to your ebook file (required). Can be:
-  - Relative path: book.pdf (if file is in current directory)
-  - Absolute path: /Users/you/Downloads/book.pdf
-  - Quoted path with spaces: "My Book.pdf"
-
-Options:
-  -c, --chapters     Chapter range (e.g., '1-5,7,10-' for chapters 1-5, 7, 10+)
-  -p, --provider     TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx
-  -v, --voice        Voice name (run 'book2audio voice list' for available voices)
-  -l, --language     Language code (zh-CN, en-US, ja-JP, etc.)
-  -s, --speed        Speech speed (0.5-2.0, defaults to 1.0)
-  --model-path       Local model path (only for qwen3_mlx provider)
-  --book-id          Add output to existing library book (share directory with web app)
+Chapter text edited via 'book2audio chapters --edit' will be used
+instead of the original text during conversion.
 
 Examples:
-  # Convert entire book with default settings
-  book2audio convert /path/to/your/book.pdf
-
-  # Convert specific chapters
+  book2audio convert book.epub
   book2audio convert book.epub -c 1-10
-
-  # Use specific provider and voice
   book2audio convert book.pdf -p edge-tts -v zh-CN-XiaoyiNeural
-
-  # Add to existing library book (share output with web app)
   book2audio convert --book-id a74e947e332e
-
-  # Use local qwen3_mlx model
-  book2audio convert book.epub -p qwen3_mlx --model-path ~/.cache/huggingface/hub/models--mlx-community--Qwen3-TTS-12Hz-0.6B-CustomVoice-8bit""")
+  book2audio convert book.epub -p qwen3_mlx""")
 @click.argument("input_file", required=False, type=click.Path(exists=True))
-@click.option("--chapters", "-c", default=None, help="Chapter range to convert (e.g., '1-5,7,10-' for chapters 1-5, 7, and 10 onwards)")
+@click.option("--chapters", "-c", default=None, help="Chapter range (e.g., '1-5,7,10-')")
 @click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx")
-@click.option("--voice", "-v", default="vivian", help="Voice name (use 'book2audio voice list' to see available voices)")
-@click.option("--language", "-l", default="zh-CN", help="Language code (e.g., zh-CN, en-US, ja-JP)")
+@click.option("--voice", "-v", default="vivian", help="Voice name (see 'book2audio doc')")
+@click.option("--language", "-l", default="zh-CN", help="Language code (zh-CN, en-US, ja-JP, etc.)")
 @click.option("--speed", "-s", type=float, default=None, help="Speech speed (0.5-2.0, default: 1.0)")
-@click.option("--model-path", default=None, help="Path to local model directory (for qwen3_mlx provider)")
-@click.option("--book-id", default=None, help="Existing book ID (convert without file path)")
+@click.option("--model-path", default=None, help="Local model path (for qwen3_mlx)")
+@click.option("--book-id", default=None, help="Existing book ID from library")
 def convert(input_file, chapters, provider, voice, language, speed, model_path, book_id):
     if not input_file and not book_id:
         console.print("[red]Error: Provide INPUT_FILE or --book-id[/red]")
@@ -149,7 +170,7 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
 
     input_path = Path(input_file) if input_file else None
     if input_path:
-        console.print(f"\n[bold blue]📚 Input:[/bold blue] {input_path.resolve()}")
+        console.print(f"\n[bold blue]Input:[/bold blue] {input_path.resolve()}")
 
     from core.converter import Converter
     converter = Converter()
@@ -159,40 +180,37 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
         if not book:
             console.print(f"[red]Book not found: {book_id}[/red]")
             raise SystemExit(1)
-        console.print(f"[bold blue]📁 Output:[/bold blue] Using existing library book: {book_id}")
-        # Reload text from parser (meta.json strips text)
-        parser = get_parser(book.file_path)
-        text_map = {ch.index: ch.text for ch in parser.get_chapters()}
+        console.print(f"[bold blue]Book:[/bold blue] {book.title} ({book_id})")
     else:
         book, text_map = _ensure_registered(input_path)
 
     all_chapters = book.chapters
-    console.print(f"[bold blue]📖 Chapters:[/bold blue] {len(all_chapters)} found")
+    console.print(f"[bold blue]Chapters:[/bold blue] {len(all_chapters)} found")
 
     if chapters:
         selected_indices = _parse_chapter_range(chapters, len(all_chapters))
         selected_chapters = [all_chapters[i] for i in selected_indices]
-        console.print(f"[bold blue]✅ Selected:[/bold blue] Chapters {chapters} ({len(selected_chapters)} chapters)")
+        console.print(f"[bold blue]Selected:[/bold blue] Chapters {chapters} ({len(selected_chapters)} chapters)")
     else:
         selected_chapters = all_chapters
-        console.print(f"[bold blue]✅ Selected:[/bold blue] All {len(selected_chapters)} chapters")
+        console.print(f"[bold blue]Selected:[/bold blue] All {len(selected_chapters)} chapters")
 
     effective_provider = provider or settings.tts.provider
-    console.print(f"[bold blue]🔊 Provider:[/bold blue] {effective_provider}")
-    console.print(f"[bold blue]🗣️ Voice:[/bold blue] {voice}")
-    console.print(f"[bold blue]🌐 Language:[/bold blue] {language}")
+    console.print(f"[bold blue]Provider:[/bold blue] {effective_provider}")
+    console.print(f"[bold blue]Voice:[/bold blue] {voice}")
+    console.print(f"[bold blue]Language:[/bold blue] {language}")
 
     if speed is None:
         if effective_provider == "qwen3_mlx":
             speed = settings.qwen3_mlx.speed
         else:
             speed = 1.0
-    console.print(f"[bold blue]⚡ Speed:[/bold blue] {speed}x")
+    console.print(f"[bold blue]Speed:[/bold blue] {speed}x")
 
     config = TTSConfig(voice=voice, language=language, speed=speed)
     if model_path:
         config.model_path = model_path
-        console.print(f"[bold blue]📦 Model Path:[/bold blue] {model_path}")
+        console.print(f"[bold blue]Model Path:[/bold blue] {model_path}")
 
     tts = get_tts_provider(provider=effective_provider, config=config)
     text_processor = TextProcessor()
@@ -218,9 +236,10 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
             task = progress.add_task(f"Converting {len(selected_chapters)} chapters...", total=len(selected_chapters))
 
             for i, chapter in enumerate(selected_chapters):
-                progress.update(task, advance=1, description=f"Chapter {chapter.index}: {chapter.title[:30]}...")
+                progress.update(task, advance=1, description=f"Chapter {chapter.index + 1}: {chapter.title[:30]}...")
 
-                chapter_text = chapter.text or text_map.get(chapter.index, "")
+                # Resolve text: disk file → in-memory → re-parse
+                chapter_text = converter.get_chapter_text(book.id, chapter.index) or ""
                 cleaned_text = text_processor.clean(chapter_text)
 
                 temp_mp3 = output_dir / f"_tmp_{chapter.index:04d}.mp3"
@@ -258,22 +277,152 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
     book.conversions.append(record)
     converter.save_book(book)
 
-    console.print("\n[bold green]✅ Conversion complete![/bold green]")
-    console.print(f"\n[bold blue]📁 Output directory:[/bold blue] {output_dir.resolve()}")
-    console.print(f"[bold blue]Files generated:[/bold blue]")
+    console.print("\n[bold green]Conversion complete![/bold green]")
+    console.print(f"\n[bold blue]Output directory:[/bold blue] {output_dir.resolve()}")
+    console.print("[bold blue]Files generated:[/bold blue]")
     for of in output_files:
-        console.print(f"  • {of.filename}")
-    console.print(f"\n[bold blue]Quick actions:[/bold blue]")
-    console.print(f"  Open directory: [cyan]open {output_dir}[/cyan]")
+        console.print(f"  - {of.filename}")
+    console.print(f"\nOpen directory: [cyan]open {output_dir}[/cyan]")
 
 
-@cli.command(help="Manage application configuration.\n\nCommands:\n  show          Show all configuration\n  get <key>     Get a specific configuration value\n  set <key> <value>  Set a configuration value\n  reset <key>   Reset a configuration value to default\n\nExamples:\n  book2audio config show\n  book2audio config get tts.provider\n  book2audio config set tts.provider edge-tts")
+# ── chapters ───────────────────────────────────────────────────────────
+
+@cli.command(help="""List, view, and edit chapters in an ebook.
+
+By default shows a chapter list with char counts and estimated duration.
+
+Use --show-text to view a chapter's full text content.
+Use --edit to open a chapter in your $EDITOR for editing. Edited text
+is saved separately and used during conversion instead of the original.
+
+Examples:
+  book2audio chapters book.epub
+  book2audio chapters --book-id a74e947e332e
+  book2audio chapters book.epub --show-text 3
+  book2audio chapters book.epub --show-text 3 --head 30
+  book2audio chapters book.epub --edit 3
+  book2audio chapters --book-id abc123 --edit 3-5""")
+@click.argument("input_file", required=False, type=click.Path(exists=True))
+@click.option("--book-id", default=None, help="Existing book ID from library")
+@click.option("--show-text", "-t", "show_text", default=None, type=int, help="Show text of chapter N (1-based)")
+@click.option("--head", default=None, type=int, help="Show only first N lines of text (use with --show-text)")
+@click.option("--edit", "-e", "edit_range", default=None, help="Edit chapter(s) in $EDITOR (e.g., '3' or '3-5')")
+def chapters(input_file, book_id, show_text, head, edit_range):
+    book, converter = _resolve_book(input_file, book_id)
+    display_name = book.title
+
+    # ── Show text mode ──
+    if show_text is not None:
+        idx = show_text - 1  # Convert 1-based to 0-based
+        chapter = next((ch for ch in book.chapters if ch.index == idx), None)
+        if not chapter:
+            console.print(f"[red]Chapter {show_text} not found. Book has {len(book.chapters)} chapters.[/red]")
+            raise SystemExit(1)
+
+        text = converter.get_chapter_text(book.id, idx)
+        if text is None:
+            console.print(f"[red]Could not load text for chapter {show_text}.[/red]")
+            raise SystemExit(1)
+
+        if head:
+            lines = text.splitlines()
+            text = "\n".join(lines[:head])
+            if len(lines) > head:
+                text += f"\n... ({len(lines) - head} more lines)"
+
+        edited_marker = " [dim yellow][edited][/dim yellow]" if chapter.edited else ""
+        console.print(Panel(
+            Text(text),
+            title=f"Chapter {show_text}: {chapter.title}{edited_marker}",
+            subtitle=f"{chapter.char_count:,} chars · ~{_format_duration(chapter.estimated_duration_seconds)}",
+        ))
+        return
+
+    # ── Edit mode ──
+    if edit_range is not None:
+        # Parse range: single number like "3" or range like "3-5"
+        if "-" in edit_range:
+            parts = edit_range.split("-")
+            start_idx = int(parts[0]) - 1
+            end_idx = int(parts[1])
+        else:
+            start_idx = int(edit_range) - 1
+            end_idx = start_idx + 1
+
+        indices = list(range(start_idx, end_idx))
+        for idx in indices:
+            chapter = next((ch for ch in book.chapters if ch.index == idx), None)
+            if not chapter:
+                console.print(f"[red]Chapter {idx + 1} not found. Skipping.[/red]")
+                continue
+
+            text = converter.get_chapter_text(book.id, idx)
+            if text is None:
+                console.print(f"[red]Could not load text for chapter {idx + 1}. Skipping.[/red]")
+                continue
+
+            edited_text = click.edit(text, extension=".txt")
+            if edited_text is None:
+                console.print(f"[dim]Chapter {idx + 1}: no changes.[/dim]")
+                continue
+
+            if edited_text == text:
+                console.print(f"[dim]Chapter {idx + 1}: content unchanged.[/dim]")
+                continue
+
+            ok = converter.save_chapter_text(book.id, idx, edited_text)
+            if ok:
+                # Refresh chapter reference after save
+                chapter = next((ch for ch in book.chapters if ch.index == idx), None)
+                console.print(
+                    f"[green]Chapter {idx + 1} saved:[/green] "
+                    f"{chapter.char_count:,} chars · ~{_format_duration(chapter.estimated_duration_seconds)}"
+                )
+            else:
+                console.print(f"[red]Failed to save chapter {idx + 1}.[/red]")
+        return
+
+    # ── Default: list chapters ──
+    chapter_list = book.chapters
+    console.print(f"\n[bold blue]Chapters in {display_name}:[/bold blue]")
+
+    total_chars = 0
+    total_duration = 0.0
+    max_num_width = len(str(len(chapter_list)))
+
+    for chapter in chapter_list:
+        char_count = chapter.char_count if chapter.char_count else (len(chapter.text) if chapter.text else 0)
+        total_chars += char_count
+        total_duration += chapter.estimated_duration_seconds
+
+        num = chapter.index + 1
+        edited_marker = " [yellow][edited][/yellow]" if chapter.edited else ""
+        console.print(f"\n[bold]{num:>{max_num_width}}. {chapter.title}{edited_marker}[/bold]")
+        console.print(f"    {char_count:,} chars · ~{_format_duration(chapter.estimated_duration_seconds)}")
+
+    console.print(f"\n[bold green]Summary:[/bold green]")
+    console.print(f"  Total chapters: {len(chapter_list)}")
+    console.print(f"  Total characters: {total_chars:,}")
+    console.print(f"  Estimated duration: {_format_duration(total_duration)}")
+    console.print(f"\n[dim]Use --show-text N to view chapter text, --edit N to edit.[/dim]")
+
+
+# ── config ─────────────────────────────────────────────────────────────
+
+@cli.command(help="""Manage application configuration.
+
+Commands: show, get, set, reset
+
+Examples:
+  book2audio config show
+  book2audio config get tts.provider
+  book2audio config set tts.provider edge-tts""")
 @click.argument("command")
 @click.argument("key", required=False)
 @click.argument("value", required=False)
 def config(command, key=None, value=None):
     from config.user_settings import get_user_settings_dict, save_user_settings
-    
+
     if command == "show":
         import json
         data = get_user_settings_dict()
@@ -328,7 +477,16 @@ def config(command, key=None, value=None):
         console.print(f"Unknown command: {command}")
 
 
-@cli.command(help="Manage TTS voices. List, add, or delete custom voices.\n\nCommands:\n  list                  List all available voices\n  add                   Add a custom voice\n  delete <name>         Delete a custom voice by name\n  show <name>           Show details of a custom voice\n\nAdd Options:\n  --provider, -p        TTS provider: elevenlabs, baidu-tts, iflytek-tts\n  --voice-id            Voice ID from provider (required)\n  --name                Display name for the voice (required)\n  --language, -l        Language code (e.g., zh-CN)\n  --gender              Voice gender: male, female, neutral\n\nExamples:\n  book2audio voice list\n  book2audio voice add --provider elevenlabs --voice-id \"xxx\" --name \"My Voice\" --language en-US\n  book2audio voice delete \"My Voice\"")
+# ── voice ──────────────────────────────────────────────────────────────
+
+@cli.command(help="""Manage TTS voices. List, add, or delete custom voices.
+
+Commands: list, add, delete, show
+
+Examples:
+  book2audio voice list
+  book2audio voice add --provider elevenlabs --voice-id "xxx" --name "My Voice" --language en-US
+  book2audio voice delete "My Voice" """)
 @click.argument("command")
 @click.argument("name", required=False)
 @click.option("--provider", "-p", default=None)
@@ -338,15 +496,15 @@ def config(command, key=None, value=None):
 def voice(command, name, provider, voice_id, language, gender):
     from config.user_settings import get_custom_voices, add_custom_voice, delete_custom_voice
     from core.tts_provider.voices import VOICE_REGISTRY
-    
+
     if command == "list":
         console.print("\n[bold blue]Available Voices:[/bold blue]")
         for prov, voices in VOICE_REGISTRY.items():
             if voices:
                 console.print(f"\n[bold]{prov}:[/bold]")
                 for v in voices:
-                    marker = "⭐" if v.custom else "•"
-                    console.print(f"  {marker} {v.name} ({v.language})")
+                    marker = " (custom)" if v.custom else ""
+                    console.print(f"  - {v.name} ({v.language}){marker}")
     elif command == "add":
         if not (name and provider and voice_id):
             console.print("Usage: book2audio voice add --provider <provider> --voice-id <id> --name <name>")
@@ -395,87 +553,25 @@ def voice(command, name, provider, voice_id, language, gender):
         console.print(f"Unknown command: {command}")
 
 
-@cli.command(help="Preview chapters in an ebook before conversion.\n\nArguments:\n  INPUT_FILE    Path to the input ebook file (EPUB, PDF, MOBI, TXT)\n\nOptions:\n  --book-id     Show chapters for an existing library book\n\nExample:\n  book2audio chapters my_book.pdf\n  book2audio chapters --book-id a74e947e332e")
-@click.argument("input_file", required=False, type=click.Path(exists=True))
-@click.option("--book-id", default=None, help="Existing book ID (skip file upload)")
-def chapters(input_file, book_id):
-    if not input_file and not book_id:
-        console.print("[red]Error: Provide INPUT_FILE or --book-id[/red]")
-        raise SystemExit(1)
+# ── library ────────────────────────────────────────────────────────────
 
-    if input_file and book_id:
-        console.print("[red]Error: Provide INPUT_FILE or --book-id, not both[/red]")
-        raise SystemExit(1)
-
-    if book_id:
-        from core.converter import Converter
-        converter = Converter()
-        book = converter.get_book(book_id)
-        if not book:
-            console.print(f"[red]Book not found: {book_id}[/red]")
-            raise SystemExit(1)
-        display_name = book.title
-    else:
-        input_path = Path(input_file)
-        book, _ = _ensure_registered(input_path)
-        display_name = input_path.name
-
-    chapter_list = book.chapters
-
-    console.print(f"\n[bold blue]📖 Chapters in {display_name}:[/bold blue]")
-
-    total_chars = 0
-    total_duration = 0.0
-    max_num_width = len(str(len(chapter_list)))
-
-    for chapter in chapter_list:
-        char_count = chapter.char_count if chapter.char_count else (len(chapter.text) if chapter.text else 0)
-        total_chars += char_count
-
-        total_duration += chapter.estimated_duration_seconds
-
-        duration_min = chapter.estimated_duration_seconds / 60
-        if duration_min < 1:
-            time_str = f"~{max(1, round(duration_min * 60))}s"
-        else:
-            time_str = f"~{round(duration_min)} min"
-
-        num = chapter.index + 1
-        console.print(f"\n[bold]{num:>{max_num_width}}. {chapter.title}[/bold]")
-        console.print(f"    {char_count:,} chars · {time_str}")
-
-    if total_duration < 60:
-        total_time_str = f"{total_duration:.0f}s"
-    elif total_duration < 3600:
-        total_time_str = f"{total_duration / 60:.1f} min"
-    else:
-        hours = int(total_duration // 3600)
-        mins = (total_duration % 3600) / 60
-        total_time_str = f"{hours}h {mins:.0f}min"
-
-    console.print(f"\n[bold green]📊 Summary:[/bold green]")
-    console.print(f"  Total chapters: {len(chapter_list)}")
-    console.print(f"  Total characters: {total_chars:,}")
-    console.print(f"  Estimated conversion time: {total_time_str}")
-
-
-@cli.group(help="Manage your audiobook library.")
+@cli.group(help="Manage your audiobook library (list, delete).")
 def library():
     pass
 
 
-@library.command(help="List all books in the library.")
-def list():
+@library.command(name="list", help="List all books in the library.")
+def library_list():
     from core.converter import Converter
-    
+
     converter = Converter()
     books = converter.get_all_books()
-    
+
     if not books:
         console.print("[yellow]No books found in library.[/yellow]")
         return
-    
-    console.print("\n[bold blue]📚 Library Books:[/bold blue]")
+
+    console.print("\n[bold blue]Library Books:[/bold blue]")
     console.print("-" * 70)
     console.print(f"{'ID':<14}  {'Title':<40}  {'Chapters'}")
     console.print("-" * 70)
@@ -487,9 +583,8 @@ def list():
 
     console.print("-" * 70)
     console.print(f"\n[bold green]Total: {len(books)} books[/bold green]")
-    console.print("\n[bold blue]Usage:[/bold blue]")
-    console.print(f"  Convert existing book: book2audio convert --book-id <BOOK_ID>")
-    console.print(f"  View chapters:         book2audio chapters --book-id <BOOK_ID>")
+    console.print("\n[dim]book2audio convert --book-id <ID>    Convert a library book")
+    console.print("[dim]book2audio chapters --book-id <ID>   View/edit chapters[/dim]")
 
 
 @library.command(help="Delete a book from the library by ID.")
@@ -504,12 +599,10 @@ def delete(book_id):
         console.print(f"[red]Book not found: {book_id}[/red]")
         raise SystemExit(1)
 
-    # Remove upload directory
     upload_dir = settings.upload_dir / book_id
     if upload_dir.exists():
         shutil.rmtree(upload_dir)
 
-    # Remove output directory
     output_dir = settings.output_dir / book_id
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -518,12 +611,143 @@ def delete(book_id):
     console.print(f"[green]Deleted: {book.title} ({book_id})[/green]")
 
 
-@cli.command(help="Start the web server to access the GUI interface.")
+# ── serve ──────────────────────────────────────────────────────────────
+
+@cli.command(help="Start the web UI server.")
 def serve():
     import uvicorn
     console.print(f"\n[bold green]Starting server at http://localhost:{settings.port}[/bold green]\n")
     uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=True)
 
+
+# ── doc ────────────────────────────────────────────────────────────────
+
+@cli.command(help="Show full documentation with all commands and examples.")
+def doc():
+    console.print(Panel(
+        "[bold]book2audio[/bold] — Convert ebooks to audiobooks with TTS\n\n"
+        "Supported formats: EPUB, PDF, TXT (always), MOBI/AZW3 (needs Calibre).\n"
+        "Web UI: [cyan]book2audio serve[/cyan]",
+        title="book2audio",
+        border_style="blue",
+    ))
+
+    console.print(Panel(
+        "[bold]book2audio convert[/bold] INPUT_FILE [OPTIONS]\n\n"
+        "Convert an ebook to audiobook. Chapter text edited via\n"
+        "'book2audio chapters --edit' is used automatically.\n\n"
+        "[bold]Options:[/bold]\n"
+        "  -c, --chapters RANGE   Chapter range (e.g., '1-5,7,10-')\n"
+        "  -p, --provider NAME    TTS provider\n"
+        "  -v, --voice NAME       Voice name\n"
+        "  -l, --language CODE    Language (zh-CN, en-US, ja-JP, etc.)\n"
+        "  -s, --speed FLOAT      Speed 0.5-2.0 (default: 1.0)\n"
+        "      --model-path PATH  Local model path (qwen3_mlx only)\n"
+        "      --book-id ID       Use existing library book\n\n"
+        "[bold]Examples:[/bold]\n"
+        "  [dim]book2audio convert book.epub[/dim]\n"
+        "  [dim]book2audio convert book.epub -c 1-10 -p edge-tts[/dim]\n"
+        "  [dim]book2audio convert --book-id abc123 -c 3,5,7[/dim]\n"
+        "  [dim]book2audio convert book.pdf -p qwen3_mlx -l en-US[/dim]",
+        title="convert",
+        border_style="green",
+    ))
+
+    console.print(Panel(
+        "[bold]book2audio chapters[/bold] INPUT_FILE [OPTIONS]\n\n"
+        "List, view, and edit chapter content.\n\n"
+        "[bold]Options:[/bold]\n"
+        "      --book-id ID       Use existing library book\n"
+        "  -t, --show-text N      Show text of chapter N (1-based)\n"
+        "      --head N           Show only first N lines (with --show-text)\n"
+        "  -e, --edit RANGE       Edit chapter(s) in $EDITOR (e.g., '3' or '3-5')\n\n"
+        "[bold]Examples:[/bold]\n"
+        "  [dim]book2audio chapters book.epub[/dim]                           List all chapters\n"
+        "  [dim]book2audio chapters book.epub -t 3[/dim]                      View chapter 3 text\n"
+        "  [dim]book2audio chapters book.epub -t 3 --head 20[/dim]            First 20 lines of ch 3\n"
+        "  [dim]book2audio chapters book.epub -e 3[/dim]                      Edit chapter 3 in $EDITOR\n"
+        "  [dim]book2audio chapters --book-id abc123 -e 3-5[/dim]             Edit chapters 3-5\n\n"
+        "[bold]Editing:[/bold]\n"
+        "  Edited text is saved to uploads/<id>/chapters/<N>.txt.\n"
+        "  Original file is never modified. Edited chapters show [yellow][edited][/yellow] tag.\n"
+        "  Conversion uses edited text automatically when available.",
+        title="chapters",
+        border_style="green",
+    ))
+
+    console.print(Panel(
+        "[bold]book2audio library[/bold] COMMAND\n\n"
+        "[bold]Commands:[/bold]\n"
+        "  list                    List all books\n"
+        "  delete BOOK_ID          Delete a book and its files\n\n"
+        "[bold]Examples:[/bold]\n"
+        "  [dim]book2audio library list[/dim]\n"
+        "  [dim]book2audio library delete abc123def456[/dim]",
+        title="library",
+        border_style="green",
+    ))
+
+    console.print(Panel(
+        "[bold]book2audio voice[/bold] COMMAND [OPTIONS]\n\n"
+        "[bold]Commands:[/bold]\n"
+        "  list                    List all voices\n"
+        "  add                     Add a custom voice\n"
+        "  delete NAME             Delete a custom voice\n"
+        "  show NAME               Show voice details\n\n"
+        "[bold]Add options:[/bold]\n"
+        "  -p, --provider PROV     Provider name\n"
+        "      --voice-id ID       Voice ID from provider\n"
+        "      --name NAME         Display name\n"
+        "  -l, --language CODE     Language code\n"
+        "      --gender GENDER     male / female / neutral\n\n"
+        "[bold]Examples:[/bold]\n"
+        "  [dim]book2audio voice list[/dim]\n"
+        "  [dim]book2audio voice add -p elevenlabs --voice-id xxx --name \"My Voice\" -l en-US[/dim]",
+        title="voice",
+        border_style="green",
+    ))
+
+    console.print(Panel(
+        "[bold]book2audio config[/bold] COMMAND [KEY] [VALUE]\n\n"
+        "[bold]Commands:[/bold]\n"
+        "  show                    Show all config\n"
+        "  get KEY                 Get a value\n"
+        "  set KEY VALUE           Set a value\n"
+        "  reset KEY               Reset to default\n\n"
+        "[bold]Examples:[/bold]\n"
+        "  [dim]book2audio config show[/dim]\n"
+        "  [dim]book2audio config get tts.provider[/dim]\n"
+        "  [dim]book2audio config set tts.provider edge-tts[/dim]\n"
+        "  [dim]book2audio config set qwen3_mlx.speed 1.2[/dim]",
+        title="config",
+        border_style="green",
+    ))
+
+    console.print(Panel(
+        "[bold]book2audio serve[/bold]\n\n"
+        "Start the web UI server for browser-based conversion.\n"
+        "Default: http://localhost:8000\n\n"
+        "[bold]Example:[/bold]\n"
+        "  [dim]book2audio serve[/dim]",
+        title="serve",
+        border_style="green",
+    ))
+
+    console.print(Panel(
+        "[bold]TTS Providers:[/bold]\n\n"
+        "  [bold]edge-tts[/bold]       Free, good quality. Microsoft Edge voices.\n"
+        "  [bold]qwen3_mlx[/bold]      Local, Apple Silicon optimized. Needs mlx-audio.\n"
+        "  [bold]baidu-tts[/bold]      Baidu API. Requires app_id + api_key.\n"
+        "  [bold]iflytek-tts[/bold]    iFlytek API. Requires app_id + api_key + api_secret.\n"
+        "  [bold]elevenlabs[/bold]     ElevenLabs API. Requires api_key.\n\n"
+        "[bold]Languages:[/bold] zh-CN, zh-TW, zh-HK, en-US, en-GB, ja-JP, ko-KR,\n"
+        "               fr-FR, de-DE, ru-RU, pt-PT, es-ES, it-IT",
+        title="providers",
+        border_style="cyan",
+    ))
+
+
+# ── helpers ────────────────────────────────────────────────────────────
 
 def _parse_chapter_range(chapter_str, total_chapters):
     indices = []

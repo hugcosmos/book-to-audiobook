@@ -233,7 +233,7 @@ body {
     border-radius: 8px;
     box-shadow: 0 1px 4px rgba(0,0,0,0.08);
 }
-.chapter-item { border-bottom: 1px solid #f3f4f6; }
+.chapter-item { border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; }
 .chapter-item:last-child { border-bottom: none; }
 .chapter-item label {
     display: flex;
@@ -242,6 +242,8 @@ body {
     padding: 0.7rem 1rem;
     cursor: pointer;
     transition: background 0.1s;
+    flex: 1;
+    min-width: 0;
 }
 .chapter-item:hover { background: #f8fafc; }
 .chapter-item.converting { background: #eff6ff; }
@@ -257,6 +259,97 @@ body {
 }
 .ch-title { flex: 1; font-weight: 500; font-size: 0.92rem; }
 .ch-meta { color: #999; font-size: 0.78rem; white-space: nowrap; }
+
+/* Edit chapter button */
+.btn-edit-chapter {
+    background: none;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0.2rem 0.4rem;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+    flex-shrink: 0;
+}
+.chapter-item:hover .btn-edit-chapter { opacity: 1; }
+.btn-edit-chapter:hover { color: #2563eb; }
+
+/* Edited badge */
+.ch-edited-badge {
+    display: inline-block;
+    background: #dcfce7;
+    color: #166534;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+}
+
+/* Chapter editor modal */
+.chapter-editor-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+}
+.chapter-editor-overlay.active { display: flex; }
+.chapter-editor-modal {
+    background: #fff;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+}
+.chapter-editor-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8rem 1.2rem;
+    border-bottom: 1px solid #e5e7eb;
+}
+.chapter-editor-header h3 { font-size: 1rem; margin: 0; }
+.chapter-editor-textarea {
+    flex: 1;
+    min-height: 400px;
+    padding: 1rem 1.2rem;
+    border: none;
+    resize: none;
+    font-family: "SF Mono", "Menlo", monospace;
+    font-size: 0.88rem;
+    line-height: 1.6;
+    outline: none;
+}
+.chapter-editor-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.6rem 1.2rem;
+    border-top: 1px solid #e5e7eb;
+    font-size: 0.85rem;
+    color: #888;
+}
+
+/* Mobile: full-screen editor */
+@media (max-width: 768px) {
+    .chapter-editor-modal {
+        width: 100%;
+        max-width: none;
+        max-height: 100vh;
+        height: 100vh;
+        border-radius: 0;
+    }
+    .btn-edit-chapter { opacity: 1; }
+}
 
 /* Right panel */
 .right-panel { flex: 1; min-width: 280px; display: flex; flex-direction: column; }
