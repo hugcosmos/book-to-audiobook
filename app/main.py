@@ -34,6 +34,28 @@ app.include_router(settings_route.router)
 from config.user_settings import load_user_settings
 load_user_settings()
 
+# Eagerly preload MLX model in background if qwen3_mlx is default provider
+def _preload_tts_model():
+    import threading
+    from utils.log import log
+
+    provider = settings.tts.provider
+    if provider != "qwen3_mlx":
+        return
+    try:
+        from core.tts_provider.qwen3_mlx_tts import Qwen3MLXTTSProvider
+        if Qwen3MLXTTSProvider._model is not None or Qwen3MLXTTSProvider._worker_started:
+            return
+        log.info("Preloading MLX model in background (non-blocking)...")
+        Qwen3MLXTTSProvider._request_queue = __import__("queue").Queue()
+        Qwen3MLXTTSProvider._worker_started = True
+        t = threading.Thread(target=Qwen3MLXTTSProvider._worker_loop, daemon=True)
+        t.start()
+    except Exception as e:
+        log.warning("MLX preload skipped: %s", e)
+
+_preload_tts_model()
+
 
 def get_available_formats() -> list[str]:
     """Get list of actually available formats based on system dependencies."""
