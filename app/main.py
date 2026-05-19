@@ -83,7 +83,13 @@ async def index(request: Request):
 def main():
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     settings.output_dir.mkdir(parents=True, exist_ok=True)
-    uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=True)
+    uvicorn.run(
+        "app.main:app",
+        host=settings.host,
+        port=settings.port,
+        reload=True,
+        reload_dirs=["app", "core", "config", "cli", "utils"],
+    )
 
 
 if __name__ == "__main__":

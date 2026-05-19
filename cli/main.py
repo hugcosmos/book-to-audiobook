@@ -617,7 +617,7 @@ def delete(book_id):
 def serve():
     import uvicorn
     console.print(f"\n[bold green]Starting server at http://localhost:{settings.port}[/bold green]\n")
-    uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=True)
+    uvicorn.run("app.main:app", host=settings.host, port=settings.port, reload=True, reload_dirs=["app", "core", "config", "cli", "utils"])
 
 
 # ── doc ────────────────────────────────────────────────────────────────
