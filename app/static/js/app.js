@@ -474,3 +474,25 @@ async function resumeConvert(bookId) {
         alert('Resume error: ' + e.message);
     }
 }
+
+// --- Check for resumable conversions on page load ---
+
+async function checkResumable() {
+    if (typeof bookId === 'undefined') return;
+    try {
+        var resp = await fetch('/api/convert/' + bookId + '/status');
+        var data = await resp.json();
+        if (data.state === 'resumable') {
+            showProgress();
+            var fill = document.getElementById('progressFill');
+            var text = document.getElementById('progressText');
+            var chapter = document.getElementById('currentChapter');
+            var cancel = document.getElementById('cancelBtn');
+            var pct = data.progress_percent.toFixed(1) + '%';
+            if (fill) fill.style.width = pct;
+            if (text) text.textContent = pct + ' \u2014 chapter ' + data.completed_chapters + '/' + data.total_chapters;
+            if (chapter) chapter.innerHTML = 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+            if (cancel) cancel.classList.add('hidden');
+        }
+    } catch (e) { /* ignore */ }
+}

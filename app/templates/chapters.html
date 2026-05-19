@@ -142,10 +142,11 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/app.js?v=6"></script>
+<script src="/static/js/app.js?v=7"></script>
 <script>
 var bookId = '{{ book.id }}';
 initTTSUI();
+checkResumable();
 
 function deleteRecord(bookId, timestamp) {
     if (!confirm('Delete this conversion record and all its files?')) return;
