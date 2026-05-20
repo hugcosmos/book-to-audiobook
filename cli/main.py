@@ -153,7 +153,7 @@ Examples:
   book2audio convert book.epub -p qwen3_mlx""")
 @click.argument("input_file", required=False, type=click.Path(exists=True))
 @click.option("--chapters", "-c", default=None, help="Chapter range (e.g., '1-5,7,10-')")
-@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx")
+@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx, voxcpm")
 @click.option("--voice", "-v", default="vivian", help="Voice name (see 'book2audio doc')")
 @click.option("--language", "-l", default="zh-CN", help="Language code (zh-CN, en-US, ja-JP, etc.)")
 @click.option("--speed", "-s", type=float, default=None, help="Speech speed (0.5-2.0, default: 1.0)")

@@ -104,6 +104,18 @@ export HF_HUB_ENABLE_HF_TRANSFER=1
 
 Set via Settings page or `book2audio config set qwen3_mlx.model_name <model>`.
 
+### Local — VoxCPM (OpenBMB)
+
+On-device diffusion-based TTS. Supports CUDA, MPS (Apple Silicon), CPU.
+
+```bash
+pip install voxcpm
+```
+
+Optional install — VoxCPM provider only activates when selected. Other providers work fine without it.
+
+Supports voice control via natural language instructions, voice cloning from reference audio, and continuation mode.
+
 ## Supported Languages
 
 Chinese (zh-CN/TW/HK), English (US/UK), Japanese, Korean, French, German, Spanish, Russian, Portuguese, Italian.
@@ -140,7 +152,7 @@ output/            # Generated audiobook files
 
 **Edge TTS**: This project includes [edge-tts](https://github.com/rany2/edge-tts) as one TTS provider, which connects to Microsoft Edge's online text-to-speech service. This is not an official Microsoft API and may violate Microsoft's Terms of Service.
 
-Users can choose alternative providers (ElevenLabs, Baidu, iFlytek, or local Qwen3 MLX) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
+Users can choose alternative providers (ElevenLabs, Baidu, iFlytek, local Qwen3 MLX, or VoxCPM) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
 
 ## License
 

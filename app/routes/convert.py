@@ -35,6 +35,8 @@ async def start_convert(book_id: str, body: ConvertBody):
         provider = body.provider or settings.tts.provider
         if provider == "qwen3_mlx":
             effective_speed = settings.qwen3_mlx.speed
+        elif provider == "voxcpm":
+            effective_speed = 1.0
         else:
             effective_speed = 1.0
     req = ConversionRequest(
@@ -58,8 +60,8 @@ async def get_status(book_id: str):
     from app.main import app
     converter = app.state.converter
     status = converter.get_status(book_id)
-    if not status:
-        # Check for resumable manifest
+    # For terminal states (failed/cancelled), check if resumable manifest exists
+    if not status or status.state in ("failed", "cancelled"):
         resumable = converter.get_resumable()
         for r in resumable:
             if r["book_id"] == book_id:
@@ -70,7 +72,8 @@ async def get_status(book_id: str):
                     completed_chapters=r["completed"],
                     progress_percent=r["progress_percent"],
                 ).model_dump()
-        return ConversionStatus(book_id=book_id, state="lost").model_dump()
+        if not status:
+            return ConversionStatus(book_id=book_id, state="lost").model_dump()
     return status.model_dump()
 
 

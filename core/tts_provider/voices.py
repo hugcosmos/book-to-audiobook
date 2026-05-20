@@ -97,12 +97,25 @@ _ELEVENLABS_VOICES = [
 ]
 
 
+# --- VoxCPM (control instruction based voices) ---
+_VOXCPM_VOICES = [
+    VoiceInfo("zh_female_warm", "温暖女声", VoiceGender.FEMALE, "zh", "voxcpm", "温暖柔和的中文女声"),
+    VoiceInfo("zh_female_bright", "明亮女声", VoiceGender.FEMALE, "zh", "voxcpm", "清脆明亮的中文女声"),
+    VoiceInfo("zh_male_deep", "低沉男声", VoiceGender.MALE, "zh", "voxcpm", "沉稳低沉的中文男声"),
+    VoiceInfo("zh_male_youth", "年轻男声", VoiceGender.MALE, "zh", "voxcpm", "充满活力的中文年轻男声"),
+    VoiceInfo("en_female_warm", "Warm Female", VoiceGender.FEMALE, "en", "voxcpm", "Warm and smooth English female"),
+    VoiceInfo("en_male_deep", "Deep Male", VoiceGender.MALE, "en", "voxcpm", "Deep resonant English male"),
+    VoiceInfo("default", "Default", VoiceGender.FEMALE, "zh", "voxcpm", "默认声音"),
+]
+
+
 VOICE_REGISTRY: dict[str, list[VoiceInfo]] = {
     "qwen3_mlx": _QWEN3_VOICES,
     "edge": _EDGE_VOICES,
     "baidu": _BAIDU_VOICES,
     "iflytek": _IFLYTEK_VOICES,
     "elevenlabs": _ELEVENLABS_VOICES,
+    "voxcpm": _VOXCPM_VOICES,
 }
 
 

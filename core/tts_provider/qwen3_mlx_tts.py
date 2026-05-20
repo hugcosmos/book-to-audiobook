@@ -357,4 +357,7 @@ def wav_to_mp3(wav_path: Path, mp3_path: Path, speed: float = 1.0) -> None:
         "-q:a", "2",
         str(mp3_path),
     ]
-    subprocess.run(cmd, check=True, capture_output=True)
+    result = subprocess.run(cmd, capture_output=True)
+    if result.returncode != 0:
+        log.error("ffmpeg wav→mp3 failed: %s\nstderr: %s", " ".join(cmd), result.stderr.decode(errors="replace"))
+        result.check_returncode()

@@ -176,7 +176,7 @@ class Converter:
                 manifest = ConversionManifest.model_validate_json(
                     manifest_path.read_text(encoding="utf-8")
                 )
-                if manifest.state == "running" and manifest.book_id in self._books:
+                if manifest.state in ("running", "failed") and manifest.book_id in self._books:
                     self._resumable[manifest.book_id] = manifest
                     log.info(
                         "Resumable conversion found: %s (%d/%d chapters done)",
@@ -393,6 +393,9 @@ class Converter:
             status.error_message = str(e)
             manifest.state = "failed"
             self._write_manifest(manifest)
+            # Re-add to resumable so user can retry without restart
+            if manifest.book_id in self._books:
+                self._resumable[manifest.book_id] = manifest
 
     @staticmethod
     def _safe_filename(name: str) -> str:

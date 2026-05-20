@@ -497,6 +497,9 @@ async function checkResumable() {
             if (text) text.textContent = pct + ' \u2014 chapter ' + data.completed_chapters + '/' + data.total_chapters;
             if (chapter) chapter.innerHTML = 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
             if (cancel) cancel.classList.add('hidden');
+        } else if (data.state === 'running' || data.state === 'pending') {
+            // Reconnect to running task — resume polling
+            startPolling(bookId);
         }
     } catch (e) { /* ignore */ }
 }
