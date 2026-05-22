@@ -351,6 +351,7 @@ def wav_to_mp3(wav_path: Path, mp3_path: Path, speed: float = 1.0) -> None:
 
     cmd = [
         settings.ffmpeg_path,
+        "-y",
         "-i", str(wav_path),
         "-filter:a", ",".join(filters),
         "-codec:a", "libmp3lame",
@@ -361,3 +362,12 @@ def wav_to_mp3(wav_path: Path, mp3_path: Path, speed: float = 1.0) -> None:
     if result.returncode != 0:
         log.error("ffmpeg wav→mp3 failed: %s\nstderr: %s", " ".join(cmd), result.stderr.decode(errors="replace"))
         result.check_returncode()
+
+
+def float_audio_to_wav(audio: np.ndarray, output_path: Path, sample_rate: int) -> None:
+    """Write float audio array directly to WAV file using soundfile."""
+    # Ensure float32 and correct shape
+    audio = np.asarray(audio, dtype=np.float32)
+    if audio.ndim > 1:
+        audio = np.squeeze(audio)
+    sf.write(str(output_path), audio, sample_rate)

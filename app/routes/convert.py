@@ -35,8 +35,6 @@ async def start_convert(book_id: str, body: ConvertBody):
         provider = body.provider or settings.tts.provider
         if provider == "qwen3_mlx":
             effective_speed = settings.qwen3_mlx.speed
-        elif provider == "voxcpm":
-            effective_speed = 1.0
         else:
             effective_speed = 1.0
     req = ConversionRequest(

@@ -23,7 +23,6 @@
                             <option value="baidu" {{ 'selected' if tts_default_provider == 'baidu' }}>Baidu</option>
                             <option value="iflytek" {{ 'selected' if tts_default_provider == 'iflytek' }}>iFlytek</option>
                             <option value="elevenlabs" {{ 'selected' if tts_default_provider == 'elevenlabs' }}>ElevenLabs</option>
-                            <option value="voxcpm" {{ 'selected' if tts_default_provider == 'voxcpm' }}>VoxCPM</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -43,7 +42,7 @@
         </div>
 
         <!-- Provider-specific configs -->
-        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q', 'voxcpm': 'V'} %}
+        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q'} %}
         {% for section, config in provider_configs.items() %}
         <div class="settings-card" data-provider-section="{{ section }}">
             <div class="settings-card-header">

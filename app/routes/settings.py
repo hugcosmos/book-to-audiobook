@@ -31,7 +31,6 @@ _PROVIDER_FIELDS = {
     "iflytek_tts": ["app_id", "api_key", "api_secret"],
     "elevenlabs": ["api_key", "model_id"],
     "qwen3_mlx": ["model_name", "chunk_max_seconds", "speed"],
-    "voxcpm": ["model_id", "device", "cfg_value", "inference_timesteps", "chunk_max_chars"],
 }
 
 _PROVIDER_LABELS = {
@@ -40,7 +39,6 @@ _PROVIDER_LABELS = {
     "iflytek_tts": "iFlytek TTS",
     "elevenlabs": "ElevenLabs",
     "qwen3_mlx": "Qwen3 MLX",
-    "voxcpm": "VoxCPM",
 }
 
 # Maps settings section name to VOICE_REGISTRY provider key
@@ -50,7 +48,6 @@ _SECTION_TO_VOICE_PROVIDER = {
     "iflytek_tts": "iflytek",
     "elevenlabs": "elevenlabs",
     "qwen3_mlx": "qwen3_mlx",
-    "voxcpm": "voxcpm",
 }
 
 
@@ -110,11 +107,10 @@ async def list_settings_voices(provider: str):
     custom = get_custom_voices(provider)
     hidden_ids = set(get_hidden_voices(provider))
     # Need all built-in voices including hidden ones, so fetch from original lists
-    from core.tts_provider.voices import VOICE_REGISTRY, _QWEN3_VOICES, _EDGE_VOICES, _BAIDU_VOICES, _IFLYTEK_VOICES, _ELEVENLABS_VOICES, _VOXCPM_VOICES
+    from core.tts_provider.voices import VOICE_REGISTRY, _QWEN3_VOICES, _EDGE_VOICES, _BAIDU_VOICES, _IFLYTEK_VOICES, _ELEVENLABS_VOICES
     _orig = {
         "qwen3_mlx": _QWEN3_VOICES, "edge": _EDGE_VOICES, "baidu": _BAIDU_VOICES,
         "iflytek": _IFLYTEK_VOICES, "elevenlabs": _ELEVENLABS_VOICES,
-        "voxcpm": _VOXCPM_VOICES,
     }
     all_builtin = _orig.get(provider, [])
     return {

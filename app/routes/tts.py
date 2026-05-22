@@ -36,7 +36,6 @@ _PROVIDER_LABELS = {
     "baidu": "百度语音合成",
     "iflytek": "科大讯飞语音合成",
     "elevenlabs": "ElevenLabs",
-    "voxcpm": "VoxCPM (本地模型)",
 }
 
 
@@ -46,8 +45,6 @@ def _is_configured(provider: str) -> bool:
         return True  # local model, no API key needed
     if provider == "edge":
         return True  # free, no auth needed
-    if provider == "voxcpm":
-        return True  # local model, no API key needed
     if provider == "baidu":
         return bool(settings.baidu_tts.api_key and settings.baidu_tts.secret_key)
     if provider == "iflytek":

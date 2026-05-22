@@ -213,7 +213,22 @@ class Converter:
             raise ValueError(f"Book not found: {book_id}")
         remaining = [i for i in manifest.selected_chapters if i not in manifest.completed_chapters]
         if not remaining:
-            raise ValueError("All chapters already completed")
+            # All chapter MP3s done — check if M4B/combined MP3 still needed
+            out_dir = settings.output_dir / book_id
+            needs_merge = False
+            if manifest.output_m4b:
+                # Check if any m4b file exists
+                if not list(out_dir.glob("*.m4b")):
+                    needs_merge = True
+            if manifest.output_mp3:
+                combined_label = self._combined_label(
+                    [ch for ch in book.chapters if ch.index in manifest.selected_chapters], book
+                )
+                combined_name = self._safe_filename(f"{combined_label}.mp3")
+                if not (out_dir / combined_name).exists():
+                    needs_merge = True
+            if not needs_merge:
+                raise ValueError("All chapters already completed")
         request = ConversionRequest(
             book_id=book_id,
             selected_chapters=remaining,
@@ -237,6 +252,9 @@ class Converter:
         book_id = request.book_id
         if book_id not in self._books:
             raise ValueError(f"Book not found: {book_id}")
+        existing = self._jobs.get(book_id)
+        if existing and existing.state in ("pending", "running"):
+            raise ValueError(f"Conversion already running for {book_id}")
         status = ConversionStatus(
             book_id=book_id,
             state="pending",
@@ -275,6 +293,13 @@ class Converter:
             out_dir = settings.output_dir / book_id
             out_dir.mkdir(parents=True, exist_ok=True)
             chapter_files: list[tuple[Chapter, Path]] = []
+            # Collect already-completed chapter MP3s (from previous resume sessions)
+            if completed_indices:
+                for ch in book.chapters:
+                    if ch.index in completed_indices:
+                        named_mp3 = out_dir / self._safe_filename(f"{book.title} - {ch.title}.mp3")
+                        if named_mp3.exists():
+                            chapter_files.append((ch, named_mp3))
             
             from core.book_parser.parser_factory import get_parser
             parser = get_parser(book.file_path)
@@ -325,12 +350,20 @@ class Converter:
                         )
                     return cb
 
+                named_mp3 = out_dir / self._safe_filename(f"{book.title} - {chapter.title}.mp3")
+                if named_mp3.exists() and named_mp3.stat().st_size > 0:
+                    log.info("Skipping chapter %d, MP3 already exists: %s", chapter.index, named_mp3.name)
+                    chapter_files.append((chapter, named_mp3))
+                    status.completed_chapters = base_completed + i + 1
+                    status.progress_percent = (base_completed + i + 1) / total_all * 100
+                    status.current_chapter = chapter.title
+                    manifest.completed_chapters.append(chapter.index)
+                    self._write_manifest(manifest)
+                    continue
                 temp_mp3 = out_dir / f"_tmp_{chapter.index:04d}.mp3"
                 log.info(f"Starting TTS synthesis to: {temp_mp3}")
                 cancel_check = lambda: self._cancel_flags.get(book_id, False)
                 await tts.synthesize(text, temp_mp3, progress=make_progress_cb(i, len(selected), base_completed, total_all), cancelled=cancel_check)
-                named_mp3 = out_dir / self._safe_filename(f"{book.title} - {chapter.title}.mp3")
-                temp_mp3.rename(named_mp3)
                 chapter_files.append((chapter, named_mp3))
                 status.completed_chapters = base_completed + i + 1
                 status.progress_percent = (base_completed + i + 1) / total_all * 100

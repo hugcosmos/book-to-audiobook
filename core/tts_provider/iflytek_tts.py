@@ -102,7 +102,7 @@ class IflytekTTSProvider(BaseTTSProvider):
         list_file.write_text("".join(f"file '{f}'\n" for f in chunk_files))
         import subprocess
         subprocess.run(
-            [settings.ffmpeg_path, "-f", "concat", "-safe", "0", "-i", str(list_file),
+            [settings.ffmpeg_path, "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
              "-c", "copy", str(output_path)],
             check=True, capture_output=True,
         )

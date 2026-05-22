@@ -61,16 +61,6 @@ class Qwen3MLXSettings(BaseModel):
     speed: float = 1.0  # speech speed via FFmpeg atempo (1.0=normal, 1.5=50% faster, 2.0=2x)
 
 
-class VoxCPMSettings(BaseModel):
-    """VoxCPM TTS — OpenBMB diffusion-based model."""
-
-    model_id: str = "openbmb/VoxCPM2"
-    device: str = "auto"  # auto | cuda | mps | cpu
-    cfg_value: float = 2.0  # Guidance scale (1.0-3.0)
-    inference_timesteps: int = 10  # Diffusion steps (4-30)
-    chunk_max_chars: int = 500  # Max chars per chunk
-
-
 class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
@@ -87,7 +77,6 @@ class Settings(BaseSettings):
     iflytek_tts: IflytekTTSSettings = IflytekTTSSettings()
     elevenlabs: ElevenLabsSettings = ElevenLabsSettings()
     qwen3_mlx: Qwen3MLXSettings = Qwen3MLXSettings()
-    voxcpm: VoxCPMSettings = VoxCPMSettings()
 
     model_config = {"env_prefix": "B2A_"}
 
