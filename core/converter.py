@@ -420,10 +420,16 @@ class Converter:
         except asyncio.CancelledError:
             status.state = "cancelled"
             status.current_chapter = "cancelled"
+            status.progress_percent = (len(manifest.completed_chapters) / len(all_selected) * 100) if all_selected else 0
+            manifest.state = "cancelled"
+            self._write_manifest(manifest)
+            if manifest.book_id in self._books:
+                self._resumable[manifest.book_id] = manifest
         except Exception as e:
             log.error("Conversion failed: %s", e, exc_info=True)
             status.state = "failed"
             status.error_message = str(e)
+            status.progress_percent = (len(manifest.completed_chapters) / len(all_selected) * 100) if all_selected else 0
             manifest.state = "failed"
             self._write_manifest(manifest)
             # Re-add to resumable so user can retry without restart

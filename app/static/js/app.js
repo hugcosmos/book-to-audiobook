@@ -293,7 +293,11 @@ async function pollStatus(bookId) {
             var pct = data.progress_percent.toFixed(1) + '%';
             fill.style.width = pct;
             text.textContent = pct + ' \u2014 chapter ' + data.completed_chapters + '/' + data.total_chapters;
-            chapter.innerHTML = 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+            if (data.completed_chapters >= data.total_chapters) {
+                chapter.innerHTML = 'All chapters synthesized. Merge interrupted. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume Merge</button>';
+            } else {
+                chapter.innerHTML = 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+            }
             cancel.classList.add('hidden');
             return;
         }
@@ -520,7 +524,9 @@ async function checkResumable() {
             var pct = data.progress_percent.toFixed(1) + '%';
             if (fill) fill.style.width = pct;
             if (text) text.textContent = pct + ' \u2014 chapter ' + data.completed_chapters + '/' + data.total_chapters;
-            if (chapter) chapter.innerHTML = 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+            if (chapter) chapter.innerHTML = data.completed_chapters >= data.total_chapters
+                ? 'All chapters synthesized. Merge interrupted. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume Merge</button>'
+                : 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
             if (cancel) cancel.classList.add('hidden');
         } else if (data.state === 'running' || data.state === 'pending') {
             // Reconnect to running task — show progress UI and resume polling

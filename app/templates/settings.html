@@ -17,7 +17,7 @@
                 <div class="settings-grid">
                     <div class="form-group">
                         <label>Default Provider</label>
-                        <select name="tts.provider" class="settings-input">
+                        <select name="tts.provider" id="defaultProvider" class="settings-input" onchange="onDefaultProviderChange()">
                             <option value="qwen3_mlx" {{ 'selected' if tts_default_provider == 'qwen3_mlx' }}>Qwen3 MLX</option>
                             <option value="edge" {{ 'selected' if tts_default_provider == 'edge' }}>Edge TTS</option>
                             <option value="baidu" {{ 'selected' if tts_default_provider == 'baidu' }}>Baidu</option>
@@ -28,27 +28,8 @@
                     </div>
                     <div class="form-group">
                         <label>Default Language</label>
-                        <select name="tts.default_language" class="settings-input">
-                            <option value="zh-CN" {{ 'selected' if tts_default_language == 'zh-CN' }}>Chinese</option>
-                            <option value="en-US" {{ 'selected' if tts_default_language == 'en-US' }}>English (US)</option>
-                            <option value="en-GB" {{ 'selected' if tts_default_language == 'en-GB' }}>English (UK)</option>
-                            <option value="ja-JP" {{ 'selected' if tts_default_language == 'ja-JP' }}>Japanese</option>
-                            <option value="ko-KR" {{ 'selected' if tts_default_language == 'ko-KR' }}>Korean</option>
-                            <option value="fr-FR" {{ 'selected' if tts_default_language == 'fr-FR' }}>French</option>
-                            <option value="de-DE" {{ 'selected' if tts_default_language == 'de-DE' }}>German</option>
-                            <option value="es-ES" {{ 'selected' if tts_default_language == 'es-ES' }}>Spanish</option>
-                            <option value="ru-RU" {{ 'selected' if tts_default_language == 'ru-RU' }}>Russian</option>
-                            <option value="pt-PT" {{ 'selected' if tts_default_language == 'pt-PT' }}>Portuguese</option>
-                            <option value="pt-BR" {{ 'selected' if tts_default_language == 'pt-BR' }}>Portuguese (Brazil)</option>
-                            <option value="it-IT" {{ 'selected' if tts_default_language == 'it-IT' }}>Italian</option>
-                            <option value="ar-SA" {{ 'selected' if tts_default_language == 'ar-SA' }}>Arabic</option>
-                            <option value="hi-IN" {{ 'selected' if tts_default_language == 'hi-IN' }}>Hindi</option>
-                            <option value="nl-NL" {{ 'selected' if tts_default_language == 'nl-NL' }}>Dutch</option>
-                            <option value="pl-PL" {{ 'selected' if tts_default_language == 'pl-PL' }}>Polish</option>
-                            <option value="tr-TR" {{ 'selected' if tts_default_language == 'tr-TR' }}>Turkish</option>
-                            <option value="vi-VN" {{ 'selected' if tts_default_language == 'vi-VN' }}>Vietnamese</option>
-                            <option value="sv-SE" {{ 'selected' if tts_default_language == 'sv-SE' }}>Swedish</option>
-                            <option value="uk-UA" {{ 'selected' if tts_default_language == 'uk-UA' }}>Ukrainian</option>
+                        <select name="tts.default_language" id="defaultLanguage" class="settings-input">
+                            <!-- populated dynamically -->
                         </select>
                     </div>
                 </div>
@@ -57,6 +38,7 @@
 
         <!-- Provider-specific configs -->
         {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q', 'supertonic': 'S'} %}
+        {% set field_labels = {'total_steps': 'Quality Steps', 'chunk_max_chars': 'Max Chars per Chunk', 'chunk_max_seconds': 'Max Chunk Duration', 'speed': 'Speed', 'model_name': 'Model Name', 'model_id': 'Model ID', 'app_id': 'App ID', 'api_key': 'API Key', 'secret_key': 'Secret Key', 'api_secret': 'API Secret'} %}
         {% for section, config in provider_configs.items() %}
         <div class="settings-card" data-provider-section="{{ section }}">
             <div class="settings-card-header">
@@ -78,11 +60,19 @@
                 <div class="settings-grid">
                     {% for field, value in config.fields.items() %}
                     <div class="form-group {{ 'full-width' if 'model_name' in field }}">
-                        <label>{{ field | replace('_', ' ') | title }}</label>
+                        <label>{{ field_labels.get(field, field | replace('_', ' ') | title) }}</label>
                         {% if 'api_key' in field or 'secret' in field %}
                         <input type="password" name="{{ section }}.{{ field }}" value="{{ value }}" class="settings-input" placeholder="Enter {{ field | replace('_', ' ') }}">
                         {% elif 'speed' in field %}
                         <input type="number" name="{{ section }}.{{ field }}" value="{{ value }}" min="0.5" max="2.0" step="0.1" class="settings-input">
+                        {% elif 'total_steps' in field %}
+                        <select name="{{ section }}.{{ field }}" class="settings-input">
+                            <option value="2" {{ 'selected' if value == 2 }}>2 — Fastest</option>
+                            <option value="5" {{ 'selected' if value == 5 or not value }}>5 — Recommended</option>
+                            <option value="8" {{ 'selected' if value == 8 }}>8 — High</option>
+                            <option value="12" {{ 'selected' if value == 12 }}>12 — Max</option>
+                            <option value="15" {{ 'selected' if value == 15 }}>15 — Extreme</option>
+                        </select>
                         {% elif 'chunk_max_seconds' in field %}
                         <select name="{{ section }}.{{ field }}" class="settings-input">
                             <option value="30" {{ 'selected' if value == 30 }}>30s — Conservative (cloned voices)</option>
@@ -90,6 +80,8 @@
                             <option value="90" {{ 'selected' if value == 90 }}>90s — Faster, occasional artifacts</option>
                             <option value="120" {{ 'selected' if value == 120 }}>120s — Max (built-in voices only)</option>
                         </select>
+                        {% elif 'chunk_max_chars' in field %}
+                        <input type="number" name="{{ section }}.{{ field }}" value="{{ value }}" min="100" max="1000" step="50" class="settings-input">
                         {% else %}
                         <input type="text" name="{{ section }}.{{ field }}" value="{{ value }}" class="settings-input" placeholder="{{ field | replace('_', ' ') }}">
                         {% endif %}
@@ -183,6 +175,35 @@
 {% endblock %}
 {% block scripts %}
 <script>
+// --- Default TTS: dynamic language based on provider ---
+function onDefaultProviderChange() {
+    loadDefaultLanguages();
+}
+
+function loadDefaultLanguages() {
+    var provider = document.getElementById('defaultProvider').value;
+    var sel = document.getElementById('defaultLanguage');
+    var prevValue = sel.value || '{{ tts_default_language }}';
+    fetch('/api/tts/languages?provider=' + encodeURIComponent(provider))
+        .then(function(r) { return r.json(); })
+        .then(function(langs) {
+            sel.innerHTML = '';
+            langs.forEach(function(l) {
+                var opt = document.createElement('option');
+                opt.value = l.code;
+                opt.textContent = l.name;
+                sel.appendChild(opt);
+            });
+            if (langs.some(function(l) { return l.code === prevValue; })) {
+                sel.value = prevValue;
+            }
+        })
+        .catch(function(e) { console.error('Failed to load languages:', e); });
+}
+
+// Load on page ready
+loadDefaultLanguages();
+
 function saveSettings(e) {
     e.preventDefault();
     var form = document.getElementById('settingsForm');
