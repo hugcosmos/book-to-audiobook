@@ -211,7 +211,7 @@ async function loadVoices() {
 // Conversion with inline progress
 var _pollTimer = null;
 
-async function startConvert(bookId) {
+async function startConvert(bookId, force) {
     var selected = [];
     document.querySelectorAll('input[name="chapters"]:checked').forEach(function(cb) {
         selected.push(parseInt(cb.value));
@@ -229,13 +229,22 @@ async function startConvert(bookId) {
     };
 
     try {
-        var resp = await fetch('/api/convert/' + bookId, {
+        var url = '/api/convert/' + bookId;
+        if (force) url += '?force=1';
+        var resp = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
         });
         var data = await resp.json();
         if (!resp.ok) throw new Error(data.detail || 'Failed to start conversion');
+        // Language mismatch warning — ask user before proceeding
+        if (data.warning && !force) {
+            if (confirm(data.warning)) {
+                return startConvert(bookId, true);
+            }
+            return;
+        }
         showProgress();
         startPolling(bookId);
     } catch (e) {
@@ -293,10 +302,12 @@ async function pollStatus(bookId) {
             var pct = data.progress_percent.toFixed(1) + '%';
             fill.style.width = pct;
             text.textContent = pct + ' \u2014 chapter ' + data.completed_chapters + '/' + data.total_chapters;
+            var btns = '<button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+            btns += ' <button class="btn btn-sm btn-danger" onclick="discardTask(\'' + bookId + '\')" style="margin-left:8px">Discard</button>';
             if (data.completed_chapters >= data.total_chapters) {
-                chapter.innerHTML = 'All chapters synthesized. Merge interrupted. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume Merge</button>';
+                chapter.innerHTML = 'All chapters synthesized. Merge interrupted.' + btns;
             } else {
-                chapter.innerHTML = 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+                chapter.innerHTML = 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed.' + btns;
             }
             cancel.classList.add('hidden');
             return;
@@ -336,7 +347,7 @@ async function pollStatus(bookId) {
             hideProgress();
         } else if (data.state === 'cancelled') {
             clearInterval(_pollTimer);
-            chapter.textContent = 'Conversion cancelled.';
+            chapter.innerHTML = 'Conversion cancelled. <button class="btn btn-sm btn-danger" onclick="discardTask(\'' + bookId + '\')" style="margin-left:8px">Discard</button>';
             cancel.classList.add('hidden');
             hideProgress();
         }
@@ -345,6 +356,17 @@ async function pollStatus(bookId) {
 
 async function cancelConvert(bookId) {
     await fetch('/api/convert/' + bookId + '/cancel', { method: 'POST' });
+}
+
+async function discardTask(bookId) {
+    if (!confirm('Discard this task and delete all output files?')) return;
+    try {
+        var resp = await fetch('/api/convert/' + bookId + '/task', { method: 'DELETE' });
+        if (!resp.ok) throw new Error('Discard failed');
+        location.reload();
+    } catch (e) {
+        alert('Error: ' + e.message);
+    }
 }
 
 // Voice preview
@@ -524,9 +546,13 @@ async function checkResumable() {
             var pct = data.progress_percent.toFixed(1) + '%';
             if (fill) fill.style.width = pct;
             if (text) text.textContent = pct + ' \u2014 chapter ' + data.completed_chapters + '/' + data.total_chapters;
-            if (chapter) chapter.innerHTML = data.completed_chapters >= data.total_chapters
-                ? 'All chapters synthesized. Merge interrupted. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume Merge</button>'
-                : 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed. <button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+            if (chapter) {
+                var btns = '<button class="btn btn-sm btn-primary" onclick="resumeConvert(\'' + bookId + '\')" style="margin-left:8px">Resume</button>';
+                btns += ' <button class="btn btn-sm btn-danger" onclick="discardTask(\'' + bookId + '\')" style="margin-left:8px">Discard</button>';
+                chapter.innerHTML = data.completed_chapters >= data.total_chapters
+                    ? 'All chapters synthesized. Merge interrupted.' + btns
+                    : 'Conversion interrupted. ' + data.completed_chapters + '/' + data.total_chapters + ' chapters completed.' + btns;
+            }
             if (cancel) cancel.classList.add('hidden');
         } else if (data.state === 'running' || data.state === 'pending') {
             // Reconnect to running task — show progress UI and resume polling

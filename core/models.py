@@ -45,6 +45,7 @@ class BookMetadata(BaseModel):
     cover_path: str = ""
     chapters: list[Chapter] = Field(default_factory=list)
     conversions: list[ConversionRecord] = Field(default_factory=list)
+    detected_language: str | None = None
     uploaded_at: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 

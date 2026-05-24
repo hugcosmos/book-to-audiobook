@@ -28,12 +28,18 @@ class MobiParser(BaseBookParser):
     def _convert_to_epub(self) -> None:
         tmp = tempfile.mkdtemp()
         out = str(Path(tmp) / "converted.epub")
-        result = subprocess.run(
-            ["ebook-convert", self.file_path, out],
-            capture_output=True,
-            text=True,
-            timeout=120,
-        )
+        try:
+            result = subprocess.run(
+                ["ebook-convert", self.file_path, out],
+                capture_output=True,
+                text=True,
+                timeout=120,
+            )
+        except FileNotFoundError:
+            raise RuntimeError(
+                "Calibre is required for MOBI/AZW3 files. "
+                "Install it from https://calibre-ebook.com/ (GPLv3, separate from this project's MIT license)"
+            )
         if result.returncode != 0:
             raise RuntimeError(f"ebook-convert failed: {result.stderr}")
         self._epub_path = out

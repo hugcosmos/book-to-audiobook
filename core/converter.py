@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import shutil
 from pathlib import Path
 
 from core.audio_builder import AudioBuilder
@@ -54,6 +55,9 @@ class Converter:
                             ch.edited = True
                 self._books[book.id] = book
                 log.info("Loaded book from disk: %s (%s)", book.title, book.id)
+                # Backfill detected_language using available text only (no re-parse)
+                if not book.detected_language:
+                    self._detect_and_save_language(book)
             except Exception as e:
                 log.warning("Failed to load %s: %s", meta_path, e)
         # Scan for resumable conversions
@@ -71,7 +75,33 @@ class Converter:
         ]
         meta_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
+    def _detect_and_save_language(self, book: BookMetadata) -> None:
+        """Detect book text language and store in metadata.
+        Samples up to 5 chapters, each using only first 500 chars.
+        Uses only in-memory text or on-disk chapter files — never triggers re-parse.
+        """
+        from collections import Counter
+        samples: list[str] = []
+        for ch in book.chapters:
+            text = ch.text or ""
+            if not text:
+                text_path = settings.upload_dir / book.id / "chapters" / f"{ch.index}.txt"
+                if text_path.exists():
+                    text = text_path.read_text(encoding="utf-8")
+            text = text.strip()[:500]
+            if len(text) > 20:
+                samples.append(TextProcessor.detect_language(text))
+            if len(samples) >= 5:
+                break
+        if samples:
+            # Store unique detected languages as comma-separated string
+            # e.g. "zh-CN" (single) or "zh-CN,en-US" (mixed)
+            unique = sorted(set(samples))
+            book.detected_language = ",".join(unique)
+            log.info("Detected language for %s: %s", book.id, book.detected_language)
+
     def add_book(self, book: BookMetadata) -> None:
+        self._detect_and_save_language(book)
         self._books[book.id] = book
         self._save_book(book)
 
@@ -126,6 +156,16 @@ class Converter:
         chapter.estimated_duration_seconds = len(cleaned) / chars_per_second
         self._save_book(book)
         return True
+
+    def discard_task(self, book_id: str) -> None:
+        """Discard a cancelled/failed task, its manifest and output files."""
+        self._jobs.pop(book_id, None)
+        self._cancel_flags.pop(book_id, None)
+        self._resumable.pop(book_id, None)
+        # Delete manifest and output files
+        out_dir = settings.output_dir / book_id
+        if out_dir.exists():
+            shutil.rmtree(out_dir)
 
     def get_book(self, book_id: str) -> BookMetadata | None:
         book = self._books.get(book_id)
@@ -255,6 +295,11 @@ class Converter:
         existing = self._jobs.get(book_id)
         if existing and existing.state in ("pending", "running"):
             raise ValueError(f"Conversion already running for {book_id}")
+        # Clear stale job from previous cancelled/failed attempt
+        if existing and existing.state in ("cancelled", "failed"):
+            self._jobs.pop(book_id, None)
+            self._cancel_flags.pop(book_id, None)
+            self._resumable.pop(book_id, None)
         status = ConversionStatus(
             book_id=book_id,
             state="pending",

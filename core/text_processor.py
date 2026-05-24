@@ -7,6 +7,29 @@ from config.settings import settings
 
 class TextProcessor:
     @staticmethod
+    def detect_language(text: str) -> str:
+        """Detect text language via character-ratio analysis.
+        Returns BCP-47 code: zh-CN, ja-JP, ko-KR, ru-RU, or en-US.
+        """
+        sample = text[:2000]
+        if not sample.strip():
+            return "en-US"
+        cjk = sum(1 for c in sample if '\u4e00' <= c <= '\u9fff')
+        hira_kata = sum(1 for c in sample if '\u3040' <= c <= '\u30ff')
+        hangul = sum(1 for c in sample if '\uac00' <= c <= '\ud7af')
+        cyrillic = sum(1 for c in sample if '\u0400' <= c <= '\u04ff')
+        total = len(sample) or 1
+        if hira_kata / total > 0.05:
+            return "ja-JP"
+        if cjk / total > 0.1:
+            return "zh-CN"
+        if hangul / total > 0.1:
+            return "ko-KR"
+        if cyrillic / total > 0.1:
+            return "ru-RU"
+        return "en-US"
+
+    @staticmethod
     def estimate_speech_duration(text: str) -> float:
         """Estimate speech duration, language-agnostic.
         CJK chars: ~4 chars/sec. Latin words: ~2.5 words/sec (150 wpm).

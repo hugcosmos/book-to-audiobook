@@ -6,7 +6,7 @@ Convert ebooks (EPUB, MOBI, AZW3, PDF, TXT) to audiobooks (M4B / MP3) with chapt
 
 - Python >= 3.11
 - [FFmpeg](https://ffmpeg.org/)
-- [Calibre](https://calibre-ebook.com/) (optional, for MOBI/AZW3)
+- [Calibre](https://calibre-ebook.com/) (optional, for MOBI/AZW3 — note: Calibre is GPLv3, separate from this project's MIT license)
 
 ## Install
 
