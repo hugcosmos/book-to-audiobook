@@ -384,8 +384,8 @@ class Converter:
                     type="chapter",
                     title=chapter.title,
                 ))
-            # Combined file name based on titles
-            combined_label = self._combined_label(selected, book)
+            # Combined file name based on all chapters in output (not just newly synthesized)
+            combined_label = self._combined_label([ch for ch, _ in chapter_files], book)
             if request.output_m4b:
                 m4b_name = self._safe_filename(f"{combined_label}.m4b")
                 m4b_path = out_dir / m4b_name
@@ -446,6 +446,8 @@ class Converter:
     @staticmethod
     def _combined_label(selected: list[Chapter], book: BookMetadata) -> str:
         """Generate combined file label from chapter titles."""
+        if not selected:
+            return book.title
         total = len(book.chapters)
         n = len(selected)
         if n == total:
