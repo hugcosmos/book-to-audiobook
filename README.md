@@ -104,9 +104,33 @@ export HF_HUB_ENABLE_HF_TRANSFER=1
 
 Set via Settings page or `book2audio config set qwen3_mlx.model_name <model>`.
 
+### Local — Supertonic (ONNX)
+
+On-device, 33 languages, no API key. Works on any platform (CPU/GPU).
+
+```bash
+pip install supertonic
+```
+
+10 built-in voices (5 male, 5 female). Supports English, Japanese, Korean, Arabic, German, French, Spanish, Russian, and 24 more languages.
+
 ## Supported Languages
 
-Chinese (zh-CN/TW/HK), English (US/UK), Japanese, Korean, French, German, Spanish, Russian, Portuguese, Italian.
+Availability depends on provider:
+
+| Language | Edge | Qwen3 MLX | ElevenLabs | Supertonic | Baidu | iFlytek |
+|----------|------|-----------|------------|------------|-------|---------|
+| Chinese (zh-CN) | ✓ | ✓ | ✓ | — | ✓ | ✓ |
+| English (en-US) | ✓ | ✓ | ✓ | ✓ | — | — |
+| Japanese | ✓ | ✓ | ✓ | ✓ | — | — |
+| Korean | ✓ | ✓ | ✓ | ✓ | — | — |
+| French | ✓ | ✓ | ✓ | ✓ | — | — |
+| German | ✓ | ✓ | ✓ | ✓ | — | — |
+| Spanish | ✓ | ✓ | ✓ | ✓ | — | — |
+| Russian | ✓ | ✓ | ✓ | ✓ | — | — |
+| Portuguese | — | ✓ | ✓ | ✓ | — | — |
+| Italian | — | ✓ | ✓ | ✓ | — | — |
+| + 23 more | — | — | — | ✓ | — | — |
 
 ## Configuration
 
@@ -140,7 +164,7 @@ output/            # Generated audiobook files
 
 **Edge TTS**: This project includes [edge-tts](https://github.com/rany2/edge-tts) as one TTS provider, which connects to Microsoft Edge's online text-to-speech service. This is not an official Microsoft API and may violate Microsoft's Terms of Service.
 
-Users can choose alternative providers (ElevenLabs, Baidu, iFlytek, or local Qwen3 MLX) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
+Users can choose alternative providers (ElevenLabs, Baidu, iFlytek, or local Qwen3 MLX / Supertonic) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
 
 ## License
 

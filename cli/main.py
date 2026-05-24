@@ -153,7 +153,7 @@ Examples:
   book2audio convert book.epub -p qwen3_mlx""")
 @click.argument("input_file", required=False, type=click.Path(exists=True))
 @click.option("--chapters", "-c", default=None, help="Chapter range (e.g., '1-5,7,10-')")
-@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx")
+@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx, supertonic")
 @click.option("--voice", "-v", default="vivian", help="Voice name (see 'book2audio doc')")
 @click.option("--language", "-l", default="zh-CN", help="Language code (zh-CN, en-US, ja-JP, etc.)")
 @click.option("--speed", "-s", type=float, default=None, help="Speech speed (0.5-2.0, default: 1.0)")
@@ -737,11 +737,12 @@ def doc():
         "[bold]TTS Providers:[/bold]\n\n"
         "  [bold]edge-tts[/bold]       Free, good quality. Microsoft Edge voices.\n"
         "  [bold]qwen3_mlx[/bold]      Local, Apple Silicon optimized. Needs mlx-audio.\n"
+        "  [bold]supertonic[/bold]     Local, ONNX-based, 33 languages. Needs supertonic.\n"
         "  [bold]baidu-tts[/bold]      Baidu API. Requires app_id + api_key.\n"
         "  [bold]iflytek-tts[/bold]    iFlytek API. Requires app_id + api_key + api_secret.\n"
         "  [bold]elevenlabs[/bold]     ElevenLabs API. Requires api_key.\n\n"
-        "[bold]Languages:[/bold] zh-CN, zh-TW, zh-HK, en-US, en-GB, ja-JP, ko-KR,\n"
-        "               fr-FR, de-DE, ru-RU, pt-PT, es-ES, it-IT",
+        "[bold]Languages:[/bold] zh-CN, en-US, ja-JP, ko-KR,\n"
+        "               fr-FR, de-DE, ru-RU, es-ES, pt-PT, it-IT + 23 more (supertonic)",
         title="providers",
         border_style="cyan",
     ))
