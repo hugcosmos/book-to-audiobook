@@ -17,11 +17,10 @@ from utils.log import log
 class EdgeTTSProvider(BaseTTSProvider):
     provider_name = "edge"
     supported_languages = [
-        "zh-CN", "zh-TW", "zh-HK",
-        "en-US", "en-GB", "en-AU",
+        "zh-CN",
+        "en-US",
         "ja-JP", "ko-KR",
-        "fr-FR", "de-DE", "ru-RU",
-        "pt-PT", "pt-BR", "es-ES", "it-IT",
+        "fr-FR", "de-DE", "ru-RU", "es-ES",
     ]
 
     def __init__(self, config: TTSConfig) -> None:

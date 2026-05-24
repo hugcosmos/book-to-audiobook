@@ -15,8 +15,8 @@ from utils.log import log
 class ElevenLabsTTSProvider(BaseTTSProvider):
     provider_name = "elevenlabs"
     supported_languages = [
-        "zh-CN", "zh-TW",
-        "en-US", "en-GB",
+        "zh-CN",
+        "en-US",
         "ja-JP", "ko-KR",
         "fr-FR", "de-DE", "ru-RU",
         "pt-PT", "es-ES", "it-IT",

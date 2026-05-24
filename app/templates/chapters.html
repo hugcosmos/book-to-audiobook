@@ -50,15 +50,7 @@
                 <div class="form-group">
                     <label>Language</label>
                     <select id="language" onchange="onLanguageChange()">
-                        <option value="zh-CN">Chinese (Mandarin)</option>
-                        <option value="en-US">English (US)</option>
-                        <option value="en-GB">English (UK)</option>
-                        <option value="ja-JP">Japanese</option>
-                        <option value="ko-KR">Korean</option>
-                        <option value="fr-FR">French</option>
-                        <option value="de-DE">German</option>
-                        <option value="es-ES">Spanish</option>
-                        <option value="ru-RU">Russian</option>
+                        <!-- populated by JS based on provider -->
                     </select>
                 </div>
                 <div class="form-group">
@@ -142,7 +134,7 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script src="/static/js/app.js?v=9"></script>
+<script src="/static/js/app.js?v=10"></script>
 <script>
 var bookId = '{{ book.id }}';
 initTTSUI();

@@ -20,11 +20,7 @@ from utils.log import log
 class IflytekTTSProvider(BaseTTSProvider):
     provider_name = "iflytek"
     supported_languages = [
-        "zh-CN", "zh-TW", "zh-HK",
-        "en-US", "en-GB",
-        "ja-JP", "ko-KR",
-        "fr-FR", "de-DE", "ru-RU",
-        "es-ES", "pt-PT", "it-IT",
+        "zh-CN",
     ]
 
     _WS_URL = "wss://tts-api.xfyun.cn/v2/tts"

@@ -60,6 +60,7 @@ var _currentProvider = '';
 
 async function initTTSUI() {
     await loadProviders();
+    await loadLanguages();
     await loadVoices();
     await loadDefaultSpeed();
     // Auto-sync speed when returning from settings tab
@@ -145,8 +146,32 @@ async function loadProviders() {
 
 async function onProviderChange() {
     _currentProvider = document.getElementById('provider').value;
+    await loadLanguages();
     await loadVoices();
     await loadDefaultSpeed();
+}
+
+async function loadLanguages() {
+    var sel = document.getElementById('language');
+    if (!sel || !_currentProvider) return;
+    try {
+        var resp = await fetch('/api/tts/languages?provider=' + encodeURIComponent(_currentProvider));
+        var langs = await resp.json();
+        var prevValue = sel.value;
+        sel.innerHTML = '';
+        langs.forEach(function(l) {
+            var opt = document.createElement('option');
+            opt.value = l.code;
+            opt.textContent = l.name;
+            sel.appendChild(opt);
+        });
+        // Try to keep previous selection if provider supports it
+        if (langs.some(function(l) { return l.code === prevValue; })) {
+            sel.value = prevValue;
+        }
+    } catch (e) {
+        console.error('Failed to load languages:', e);
+    }
 }
 
 async function onLanguageChange() {

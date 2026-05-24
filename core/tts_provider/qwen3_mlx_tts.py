@@ -26,8 +26,8 @@ class Qwen3MLXTTSProvider(BaseTTSProvider):
 
     provider_name = "qwen3_mlx"
     supported_languages = [
-        "zh-CN", "zh-TW", "zh-HK",
-        "en-US", "en-GB",
+        "zh-CN",
+        "en-US",
         "ja-JP", "ko-KR",
         "fr-FR", "de-DE", "ru-RU",
         "pt-PT", "es-ES", "it-IT",

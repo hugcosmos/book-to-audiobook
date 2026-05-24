@@ -23,18 +23,32 @@
                             <option value="baidu" {{ 'selected' if tts_default_provider == 'baidu' }}>Baidu</option>
                             <option value="iflytek" {{ 'selected' if tts_default_provider == 'iflytek' }}>iFlytek</option>
                             <option value="elevenlabs" {{ 'selected' if tts_default_provider == 'elevenlabs' }}>ElevenLabs</option>
+                            <option value="supertonic" {{ 'selected' if tts_default_provider == 'supertonic' }}>Supertonic (Local · 31 langs)</option>
                         </select>
                     </div>
                     <div class="form-group">
                         <label>Default Language</label>
                         <select name="tts.default_language" class="settings-input">
-                            <option value="zh-CN" {{ 'selected' if tts_default_language == 'zh-CN' }}>Chinese (Mandarin)</option>
+                            <option value="zh-CN" {{ 'selected' if tts_default_language == 'zh-CN' }}>Chinese</option>
                             <option value="en-US" {{ 'selected' if tts_default_language == 'en-US' }}>English (US)</option>
                             <option value="en-GB" {{ 'selected' if tts_default_language == 'en-GB' }}>English (UK)</option>
                             <option value="ja-JP" {{ 'selected' if tts_default_language == 'ja-JP' }}>Japanese</option>
                             <option value="ko-KR" {{ 'selected' if tts_default_language == 'ko-KR' }}>Korean</option>
                             <option value="fr-FR" {{ 'selected' if tts_default_language == 'fr-FR' }}>French</option>
                             <option value="de-DE" {{ 'selected' if tts_default_language == 'de-DE' }}>German</option>
+                            <option value="es-ES" {{ 'selected' if tts_default_language == 'es-ES' }}>Spanish</option>
+                            <option value="ru-RU" {{ 'selected' if tts_default_language == 'ru-RU' }}>Russian</option>
+                            <option value="pt-PT" {{ 'selected' if tts_default_language == 'pt-PT' }}>Portuguese</option>
+                            <option value="pt-BR" {{ 'selected' if tts_default_language == 'pt-BR' }}>Portuguese (Brazil)</option>
+                            <option value="it-IT" {{ 'selected' if tts_default_language == 'it-IT' }}>Italian</option>
+                            <option value="ar-SA" {{ 'selected' if tts_default_language == 'ar-SA' }}>Arabic</option>
+                            <option value="hi-IN" {{ 'selected' if tts_default_language == 'hi-IN' }}>Hindi</option>
+                            <option value="nl-NL" {{ 'selected' if tts_default_language == 'nl-NL' }}>Dutch</option>
+                            <option value="pl-PL" {{ 'selected' if tts_default_language == 'pl-PL' }}>Polish</option>
+                            <option value="tr-TR" {{ 'selected' if tts_default_language == 'tr-TR' }}>Turkish</option>
+                            <option value="vi-VN" {{ 'selected' if tts_default_language == 'vi-VN' }}>Vietnamese</option>
+                            <option value="sv-SE" {{ 'selected' if tts_default_language == 'sv-SE' }}>Swedish</option>
+                            <option value="uk-UA" {{ 'selected' if tts_default_language == 'uk-UA' }}>Ukrainian</option>
                         </select>
                     </div>
                 </div>
@@ -42,7 +56,7 @@
         </div>
 
         <!-- Provider-specific configs -->
-        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q'} %}
+        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q', 'supertonic': 'S'} %}
         {% for section, config in provider_configs.items() %}
         <div class="settings-card" data-provider-section="{{ section }}">
             <div class="settings-card-header">
@@ -51,6 +65,8 @@
                 {% if section == 'edge_tts' %}
                 <span class="provider-badge badge-free">Free</span>
                 {% elif section == 'qwen3_mlx' %}
+                <span class="provider-badge badge-local">Local</span>
+                {% elif section == 'supertonic' %}
                 <span class="provider-badge badge-local">Local</span>
                 {% else %}
                 <span class="provider-badge badge-api">API Key Required</span>
@@ -137,7 +153,7 @@
                     </div>
                 </div>
                 {% endif %}
-                {% if section != 'qwen3_mlx' %}
+                {% if section != 'qwen3_mlx' and section != 'supertonic' %}
                 <div class="voice-add-form">
                     <h4>Add Custom Voice (manual)</h4>
                     <div class="voice-add-fields">

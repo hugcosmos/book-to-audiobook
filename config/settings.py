@@ -9,7 +9,7 @@ from pydantic_settings import BaseSettings
 class TTSSettings(BaseModel):
     """TTS provider selection and common params."""
 
-    provider: str = "qwen3_mlx"  # qwen3_mlx | edge | baidu | iflytek | elevenlabs
+    provider: str = "qwen3_mlx"  # qwen3_mlx | edge | baidu | iflytek | elevenlabs | supertonic
     default_voice: str = "vivian"
     default_language: str = "zh-CN"
     max_retries: int = 5
@@ -61,6 +61,14 @@ class Qwen3MLXSettings(BaseModel):
     speed: float = 1.0  # speech speed via FFmpeg atempo (1.0=normal, 1.5=50% faster, 2.0=2x)
 
 
+class SupertonicSettings(BaseModel):
+    """Supertonic TTS — local ONNX-based, 31 languages."""
+
+    total_steps: int = 5       # quality: 2-15
+    speed: float = 1.0         # speech speed multiplier
+    chunk_max_chars: int = 300 # matches supertonic's default
+
+
 class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8000
@@ -77,6 +85,7 @@ class Settings(BaseSettings):
     iflytek_tts: IflytekTTSSettings = IflytekTTSSettings()
     elevenlabs: ElevenLabsSettings = ElevenLabsSettings()
     qwen3_mlx: Qwen3MLXSettings = Qwen3MLXSettings()
+    supertonic: SupertonicSettings = SupertonicSettings()
 
     model_config = {"env_prefix": "B2A_"}
 

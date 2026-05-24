@@ -20,17 +20,17 @@ class VoiceInfo:
     custom: bool = False
 
 
-# --- Qwen3 TTS (9 speakers, multilingual) ---
+# --- Qwen3 TTS (9 speakers, all multilingual) ---
 _QWEN3_VOICES = [
-    VoiceInfo("vivian", "Vivian", VoiceGender.FEMALE, "zh", "qwen3_mlx", "明亮略带棱角的年轻女声"),
-    VoiceInfo("serena", "Serena", VoiceGender.FEMALE, "zh", "qwen3_mlx", "温暖柔和的年轻女声"),
-    VoiceInfo("uncle_fu", "Uncle Fu", VoiceGender.MALE, "zh", "qwen3_mlx", "沉稳低沉的男声"),
-    VoiceInfo("dylan", "Dylan", VoiceGender.MALE, "zh", "qwen3_mlx", "北京口音年轻男声"),
-    VoiceInfo("eric", "Eric", VoiceGender.MALE, "zh", "qwen3_mlx", "成都口音男声，略带沙哑"),
-    VoiceInfo("ryan", "Ryan", VoiceGender.MALE, "en", "qwen3_mlx", "Dynamic male, strong rhythm"),
-    VoiceInfo("aiden", "Aiden", VoiceGender.MALE, "en", "qwen3_mlx", "Sunny American male voice"),
-    VoiceInfo("ono_anna", "Ono Anna", VoiceGender.FEMALE, "ja", "qwen3_mlx", "Playful Japanese female"),
-    VoiceInfo("sohee", "Sohee", VoiceGender.FEMALE, "ko", "qwen3_mlx", "Warm Korean female"),
+    VoiceInfo("vivian", "Vivian", VoiceGender.FEMALE, "multi", "qwen3_mlx", "明亮略带棱角的年轻女声"),
+    VoiceInfo("serena", "Serena", VoiceGender.FEMALE, "multi", "qwen3_mlx", "温暖柔和的年轻女声"),
+    VoiceInfo("uncle_fu", "Uncle Fu", VoiceGender.MALE, "multi", "qwen3_mlx", "沉稳低沉的男声"),
+    VoiceInfo("dylan", "Dylan", VoiceGender.MALE, "multi", "qwen3_mlx", "北京口音年轻男声"),
+    VoiceInfo("eric", "Eric", VoiceGender.MALE, "multi", "qwen3_mlx", "成都口音男声，略带沙哑"),
+    VoiceInfo("ryan", "Ryan", VoiceGender.MALE, "multi", "qwen3_mlx", "Dynamic male, strong rhythm"),
+    VoiceInfo("aiden", "Aiden", VoiceGender.MALE, "multi", "qwen3_mlx", "Sunny American male voice"),
+    VoiceInfo("ono_anna", "Ono Anna", VoiceGender.FEMALE, "multi", "qwen3_mlx", "Playful Japanese female"),
+    VoiceInfo("sohee", "Sohee", VoiceGender.FEMALE, "multi", "qwen3_mlx", "Warm Korean female"),
 ]
 
 # --- Edge TTS (common subset) ---
@@ -80,20 +80,34 @@ _IFLYTEK_VOICES = [
     VoiceInfo("aisbabyxu", "许小宝", VoiceGender.FEMALE, "zh", "iflytek", "童声"),
 ]
 
-# --- ElevenLabs (native premade voices) ---
+# --- Supertonic (10 built-in voices, 31 languages) ---
+_SUPERTONIC_VOICES = [
+    VoiceInfo("M1", "M1 · Marcus", VoiceGender.MALE, "multi", "supertonic", "Warm, clear male"),
+    VoiceInfo("M2", "M2 · James", VoiceGender.MALE, "multi", "supertonic", "Deep, resonant male"),
+    VoiceInfo("M3", "M3 · Kai", VoiceGender.MALE, "multi", "supertonic", "Bright, energetic male"),
+    VoiceInfo("M4", "M4 · Lucas", VoiceGender.MALE, "multi", "supertonic", "Smooth, narrator male"),
+    VoiceInfo("M5", "M5 · Oscar", VoiceGender.MALE, "multi", "supertonic", "Soft, gentle male"),
+    VoiceInfo("F1", "F1 · Clara", VoiceGender.FEMALE, "multi", "supertonic", "Bright, professional female"),
+    VoiceInfo("F2", "F2 · Nova", VoiceGender.FEMALE, "multi", "supertonic", "Warm, friendly female"),
+    VoiceInfo("F3", "F3 · Luna", VoiceGender.FEMALE, "multi", "supertonic", "Soft, calm female"),
+    VoiceInfo("F4", "F4 · Iris", VoiceGender.FEMALE, "multi", "supertonic", "Clear, articulate female"),
+    VoiceInfo("F5", "F5 · Sophie", VoiceGender.FEMALE, "multi", "supertonic", "Sweet, melodic female"),
+]
+
+# --- ElevenLabs (native premade voices, all multilingual via eleven_multilingual_v2) ---
 _ELEVENLABS_VOICES = [
-    VoiceInfo("pNInz6obpgDQGcFmaJgB", "Adam", VoiceGender.MALE, "en", "elevenlabs", "Dominant, Firm · American"),
-    VoiceInfo("hpp4J3VqNfWAUOO0d1Us", "Bella", VoiceGender.FEMALE, "en", "elevenlabs", "Professional, Bright · American"),
-    VoiceInfo("nPczCjzI2devNBz1zQrb", "Brian", VoiceGender.MALE, "en", "elevenlabs", "Deep, Resonant · American"),
-    VoiceInfo("onwK4e9ZLuTAKqWW03F9", "Daniel", VoiceGender.MALE, "en", "elevenlabs", "Steady Broadcaster · British"),
-    VoiceInfo("cjVigY5qzO86Huf0OWal", "Eric", VoiceGender.MALE, "en", "elevenlabs", "Smooth, Trustworthy · American"),
-    VoiceInfo("JBFqnCBsd6RMkjVDRZzb", "George", VoiceGender.MALE, "en", "elevenlabs", "Warm Storyteller · British"),
-    VoiceInfo("Xb7hH8MSUJpSbSDYk0k2", "Alice", VoiceGender.FEMALE, "en", "elevenlabs", "Clear Educator · British"),
-    VoiceInfo("pFZP5JQG7iQjIQuC4Bku", "Lily", VoiceGender.FEMALE, "en", "elevenlabs", "Velvety Actress · British"),
-    VoiceInfo("XrExE9yKIg1WjnnlVkGX", "Matilda", VoiceGender.FEMALE, "en", "elevenlabs", "Professional · American"),
-    VoiceInfo("pqHfZKP75CvOlQylNhV4", "Bill", VoiceGender.MALE, "en", "elevenlabs", "Wise, Mature · American"),
-    VoiceInfo("iP95p4xoKVk53GoZ742B", "Chris", VoiceGender.MALE, "en", "elevenlabs", "Charming · American"),
-    VoiceInfo("SAz9YHcvj6GT2YYXdXww", "River", VoiceGender.FEMALE, "en", "elevenlabs", "Calm, Informative · American"),
+    VoiceInfo("pNInz6obpgDQGcFmaJgB", "Adam", VoiceGender.MALE, "multi", "elevenlabs", "Dominant, Firm · American"),
+    VoiceInfo("hpp4J3VqNfWAUOO0d1Us", "Bella", VoiceGender.FEMALE, "multi", "elevenlabs", "Professional, Bright · American"),
+    VoiceInfo("nPczCjzI2devNBz1zQrb", "Brian", VoiceGender.MALE, "multi", "elevenlabs", "Deep, Resonant · American"),
+    VoiceInfo("onwK4e9ZLuTAKqWW03F9", "Daniel", VoiceGender.MALE, "multi", "elevenlabs", "Steady Broadcaster · British"),
+    VoiceInfo("cjVigY5qzO86Huf0OWal", "Eric", VoiceGender.MALE, "multi", "elevenlabs", "Smooth, Trustworthy · American"),
+    VoiceInfo("JBFqnCBsd6RMkjVDRZzb", "George", VoiceGender.MALE, "multi", "elevenlabs", "Warm Storyteller · British"),
+    VoiceInfo("Xb7hH8MSUJpSbSDYk0k2", "Alice", VoiceGender.FEMALE, "multi", "elevenlabs", "Clear Educator · British"),
+    VoiceInfo("pFZP5JQG7iQjIQuC4Bku", "Lily", VoiceGender.FEMALE, "multi", "elevenlabs", "Velvety Actress · British"),
+    VoiceInfo("XrExE9yKIg1WjnnlVkGX", "Matilda", VoiceGender.FEMALE, "multi", "elevenlabs", "Professional · American"),
+    VoiceInfo("pqHfZKP75CvOlQylNhV4", "Bill", VoiceGender.MALE, "multi", "elevenlabs", "Wise, Mature · American"),
+    VoiceInfo("iP95p4xoKVk53GoZ742B", "Chris", VoiceGender.MALE, "multi", "elevenlabs", "Charming · American"),
+    VoiceInfo("SAz9YHcvj6GT2YYXdXww", "River", VoiceGender.FEMALE, "multi", "elevenlabs", "Calm, Informative · American"),
 ]
 
 
@@ -103,6 +117,7 @@ VOICE_REGISTRY: dict[str, list[VoiceInfo]] = {
     "baidu": _BAIDU_VOICES,
     "iflytek": _IFLYTEK_VOICES,
     "elevenlabs": _ELEVENLABS_VOICES,
+    "supertonic": _SUPERTONIC_VOICES,
 }
 
 
@@ -111,5 +126,5 @@ def get_voices(provider: str, language: str | None = None) -> list[VoiceInfo]:
     voices = VOICE_REGISTRY.get(provider, [])
     if language:
         prefix = language.split("-")[0].lower()
-        voices = [v for v in voices if v.language.split("-")[0].lower() == prefix]
+        voices = [v for v in voices if v.language == "multi" or v.language.split("-")[0].lower() == prefix]
     return voices

@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse
 
 from config.settings import settings
 from core.models import TTSConfig
-from core.tts_provider.tts_factory import get_tts_provider
+from core.tts_provider.tts_factory import _PROVIDER_MAP, get_tts_provider
 from core.tts_provider.voices import VoiceGender, VoiceInfo, get_voices
 
 router = APIRouter(prefix="/api/tts")
@@ -30,12 +30,34 @@ class VoiceItem(BaseModel):
     description: str
 
 
+class LanguageItem(BaseModel):
+    code: str
+    name: str
+
+
+_LANG_DISPLAY = {
+    "zh-CN": "Chinese",
+    "en-US": "English (US)", "en-GB": "English (UK)",
+    "ja-JP": "Japanese", "ko-KR": "Korean",
+    "fr-FR": "French", "de-DE": "German", "ru-RU": "Russian",
+    "es-ES": "Spanish", "pt-PT": "Portuguese (Portugal)", "pt-BR": "Portuguese (Brazil)",
+    "it-IT": "Italian", "nl-NL": "Dutch",
+    "ar-SA": "Arabic", "hi-IN": "Hindi",
+    "bg-BG": "Bulgarian", "cs-CZ": "Czech", "da-DK": "Danish", "el-GR": "Greek",
+    "et-EE": "Estonian", "fi-FI": "Finnish", "hr-HR": "Croatian", "hu-HU": "Hungarian",
+    "id-ID": "Indonesian", "lt-LT": "Lithuanian", "lv-LV": "Latvian",
+    "pl-PL": "Polish", "ro-RO": "Romanian", "sk-SK": "Slovak", "sl-SI": "Slovenian",
+    "sv-SE": "Swedish", "tr-TR": "Turkish", "uk-UA": "Ukrainian", "vi-VN": "Vietnamese",
+}
+
+
 _PROVIDER_LABELS = {
     "qwen3_mlx": "Qwen3 TTS (MLX · Apple Silicon)",
     "edge": "Edge TTS (免费在线)",
     "baidu": "百度语音合成",
     "iflytek": "科大讯飞语音合成",
     "elevenlabs": "ElevenLabs",
+    "supertonic": "Supertonic (Local · 31 langs)",
 }
 
 
@@ -51,6 +73,12 @@ def _is_configured(provider: str) -> bool:
         return bool(settings.iflytek_tts.api_key and settings.iflytek_tts.api_secret)
     if provider == "elevenlabs":
         return bool(settings.elevenlabs.api_key)
+    if provider == "supertonic":
+        try:
+            import supertonic  # noqa: F401
+            return True
+        except ImportError:
+            return False
     return False
 
 
@@ -65,6 +93,20 @@ async def list_providers():
             configured=_is_configured(name),
         ))
     return providers
+
+
+@router.get("/languages")
+async def list_languages(provider: str):
+    """Get supported languages for a provider."""
+    if provider not in _PROVIDER_MAP:
+        raise HTTPException(400, f"Unknown provider: {provider}")
+    from importlib import import_module
+    module_path, class_name = _PROVIDER_MAP[provider]
+    cls = getattr(import_module(module_path), class_name)
+    return [
+        LanguageItem(code=lang, name=_LANG_DISPLAY.get(lang, lang))
+        for lang in cls.supported_languages
+    ]
 
 
 @router.get("/voices")
@@ -93,12 +135,39 @@ class PreviewBody(BaseModel):
 _PREVIEW_DIR = Path(settings.output_dir) / "_preview"
 _PREVIEW_TEXTS = {
     "zh-CN": "你好，这是语音预览。",
-    "zh-TW": "你好，這是語音預覽。",
-    "zh-HK": "你好，這是語音預覽。",
     "en-US": "Hello, this is a voice preview.",
     "en-GB": "Hello, this is a voice preview.",
     "ja-JP": "こんにちは、これは音声プレビューです。",
     "ko-KR": "안녕하세요, 음성 미리보기입니다.",
+    "fr-FR": "Bonjour, ceci est un aperçu vocal.",
+    "de-DE": "Hallo, dies ist eine Sprachvorschau.",
+    "ru-RU": "Здравствуйте, это предпрослушивание голоса.",
+    "es-ES": "Hola, esta es una vista previa de voz.",
+    "pt-PT": "Olá, esta é uma prévia de voz.",
+    "pt-BR": "Olá, esta é uma prévia de voz.",
+    "it-IT": "Ciao, questa è un'anteprima vocale.",
+    "ar-SA": "مرحبا، هذا معاينة صوتية.",
+    "hi-IN": "नमस्ते, यह एक आवाज़ पूर्वावलोकन है।",
+    "nl-NL": "Hallo, dit is een spraakvoorbeeld.",
+    "pl-PL": "Cześć, to jest podgląd głosu.",
+    "tr-TR": "Merhaba, bu bir ses önizlemesidir.",
+    "vi-VN": "Xin chào, đây là bản xem trước giọng nói.",
+    "sv-SE": "Hej, det här är en förhandsgranskning av rösten.",
+    "uk-UA": "Привіт, це попередній перегляд голосу.",
+    "bg-BG": "Здравейте, това е предварителен преглед на гласа.",
+    "cs-CZ": "Dobrý den, toto je náhled hlasu.",
+    "da-DK": "Hej, dette er en forhåndsvisning af stemmen.",
+    "el-GR": "Γεια σας, αυτή είναι μια προεπισκόπηση φωνής.",
+    "et-EE": "Tere, see on hääle eelvaade.",
+    "fi-FI": "Hei, tämä on äänen esikatselu.",
+    "hr-HR": "Pozdrav, ovo je pregled glasa.",
+    "hu-HU": "Helló, ez egy hang előnézet.",
+    "id-ID": "Halo, ini adalah pratinjau suara.",
+    "lt-LT": "Sveiki, tai balso peržiūra.",
+    "lv-LV": "Sveiki, šis ir balss priekšskatījums.",
+    "ro-RO": "Bună, aceasta este o previzualizare vocală.",
+    "sk-SK": "Dobrý deň, toto je náhľad hlasu.",
+    "sl-SI": "Pozdravljeni, to je predoglas glasu.",
 }
 
 
