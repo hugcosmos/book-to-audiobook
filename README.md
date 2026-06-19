@@ -114,23 +114,36 @@ pip install supertonic
 
 10 built-in voices (5 male, 5 female). Supports English, Japanese, Korean, Arabic, German, French, Spanish, Russian, and 24 more languages.
 
+### Local — CosyVoice (ONNX / CPU, via sherpa-onnx)
+
+On-device, multilingual (zh / en / ja / ko), no API key. Runs entirely on CPU through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) — **the recommended local provider for low-spec or GPU-less machines** (e.g. Intel MacBook Air), where the native PyTorch CosyVoice would be unusably slow.
+
+```bash
+pip install "book-to-audiobook[cosyvoice]"
+# or directly: pip install sherpa-onnx huggingface-hub
+```
+
+The quantized ONNX model (~0.6–1.2 GB) is downloaded automatically on first use. **ModelScope is tried first** (CosyVoice is Alibaba's; ModelScope is fastest in mainland China), with a HuggingFace fallback. Files land in `~/.cache/book2audio/cosyvoice2` (override with `B2A_COSYVOICE__MODEL_DIR`). To force a source: `B2A_COSYVOICE__DOWNLOAD_SOURCE=modelscope|auto` (or set `modelscope_repo`/`huggingface_repo` to pin a mirror). 4 preset voices (Chinese/English, male/female).
+
+> Performance note: inference is CPU-bound. Expect a real-time factor around 0.3–1.5× (one minute of audio in ~0.3–1.5 minutes), depending on your CPU and `num_threads`. The first synthesis also pays a one-time model-load cost (~10–30s). Tune `B2A_COSYVOICE__NUM_THREADS` (default 2) and `B2A_COSYVOICE__CHUNK_MAX_CHARS` (default 120) to balance speed vs. system responsiveness.
+
 ## Supported Languages
 
 Availability depends on provider:
 
-| Language | Edge | Qwen3 MLX | ElevenLabs | Supertonic | Baidu | iFlytek |
-|----------|------|-----------|------------|------------|-------|---------|
-| Chinese (zh-CN) | ✓ | ✓ | ✓ | — | ✓ | ✓ |
-| English (en-US) | ✓ | ✓ | ✓ | ✓ | — | — |
-| Japanese | ✓ | ✓ | ✓ | ✓ | — | — |
-| Korean | ✓ | ✓ | ✓ | ✓ | — | — |
-| French | ✓ | ✓ | ✓ | ✓ | — | — |
-| German | ✓ | ✓ | ✓ | ✓ | — | — |
-| Spanish | ✓ | ✓ | ✓ | ✓ | — | — |
-| Russian | ✓ | ✓ | ✓ | ✓ | — | — |
-| Portuguese | — | ✓ | ✓ | ✓ | — | — |
-| Italian | — | ✓ | ✓ | ✓ | — | — |
-| + 23 more | — | — | — | ✓ | — | — |
+| Language | Edge | Qwen3 MLX | ElevenLabs | Supertonic | CosyVoice | Baidu | iFlytek |
+|----------|------|-----------|------------|------------|-----------|-------|---------|
+| Chinese (zh-CN) | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ |
+| English (en-US) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| Japanese | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| Korean | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| French | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| German | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| Spanish | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| Russian | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| Portuguese | — | ✓ | ✓ | ✓ | — | — | — |
+| Italian | — | ✓ | ✓ | ✓ | — | — | — |
+| + 23 more | — | — | — | ✓ | — | — | — |
 
 ## Configuration
 

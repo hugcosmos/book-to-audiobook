@@ -107,13 +107,18 @@ def merge_custom_voices() -> None:
 
 def _rebuild_registry() -> None:
     """Rebuild VOICE_REGISTRY keeping only built-in voices."""
-    from core.tts_provider.voices import VOICE_REGISTRY, _QWEN3_VOICES, _EDGE_VOICES, _BAIDU_VOICES, _IFLYTEK_VOICES, _ELEVENLABS_VOICES
+    from core.tts_provider.voices import (
+        VOICE_REGISTRY, _QWEN3_VOICES, _EDGE_VOICES, _BAIDU_VOICES,
+        _IFLYTEK_VOICES, _ELEVENLABS_VOICES, _SUPERTONIC_VOICES, _COSYVOICE_VOICES,
+    )
 
     VOICE_REGISTRY["qwen3_mlx"] = list(_QWEN3_VOICES)
     VOICE_REGISTRY["edge"] = list(_EDGE_VOICES)
     VOICE_REGISTRY["baidu"] = list(_BAIDU_VOICES)
     VOICE_REGISTRY["iflytek"] = list(_IFLYTEK_VOICES)
     VOICE_REGISTRY["elevenlabs"] = list(_ELEVENLABS_VOICES)
+    VOICE_REGISTRY["supertonic"] = list(_SUPERTONIC_VOICES)
+    VOICE_REGISTRY["cosyvoice"] = list(_COSYVOICE_VOICES)
 
 
 def get_custom_voices(provider: str) -> list[dict]:

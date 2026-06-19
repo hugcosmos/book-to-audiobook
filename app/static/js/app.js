@@ -80,6 +80,10 @@ async function loadDefaultSpeed() {
             speed = data.convert_speed[provider];
         } else if (provider === 'qwen3_mlx' && data.qwen3_mlx && data.qwen3_mlx.speed != null) {
             speed = data.qwen3_mlx.speed;
+        } else if (provider === 'supertonic' && data.supertonic && data.supertonic.speed != null) {
+            speed = data.supertonic.speed;
+        } else if (provider === 'cosyvoice' && data.cosyvoice && data.cosyvoice.speed != null) {
+            speed = data.cosyvoice.speed;
         }
         var el = document.getElementById('speed');
         if (el) {

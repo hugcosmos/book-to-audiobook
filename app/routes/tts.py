@@ -58,6 +58,7 @@ _PROVIDER_LABELS = {
     "iflytek": "科大讯飞语音合成",
     "elevenlabs": "ElevenLabs",
     "supertonic": "Supertonic (Local · 31 langs)",
+    "cosyvoice": "CosyVoice (本地 · ONNX/CPU)",
 }
 
 
@@ -76,6 +77,12 @@ def _is_configured(provider: str) -> bool:
     if provider == "supertonic":
         try:
             import supertonic  # noqa: F401
+            return True
+        except ImportError:
+            return False
+    if provider == "cosyvoice":
+        try:
+            import sherpa_onnx  # noqa: F401
             return True
         except ImportError:
             return False

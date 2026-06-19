@@ -13,6 +13,7 @@ _PROVIDER_MAP: dict[str, tuple[str, str]] = {
     "iflytek": ("core.tts_provider.iflytek_tts", "IflytekTTSProvider"),
     "elevenlabs": ("core.tts_provider.elevenlabs_tts", "ElevenLabsTTSProvider"),
     "supertonic": ("core.tts_provider.supertonic_tts", "SupertonicTTSProvider"),
+    "cosyvoice": ("core.tts_provider.cosyvoice_tts", "CosyVoiceTTSProvider"),
 }
 
 

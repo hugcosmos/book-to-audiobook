@@ -45,6 +45,17 @@ dependencies = [
 [project.scripts]
 book2audio = "cli.main:cli"
 
+[project.optional-dependencies]
+# CosyVoice local TTS — ONNX runtime on CPU. Recommended for low-spec / GPU-less
+# machines (e.g. Intel MacBook Air). Install with: pip install "book-to-audiobook[cosyvoice]"
+# The model is downloaded on first use from ModelScope (preferred in mainland
+# China) or HuggingFace; either modelscope or huggingface-hub is enough.
+cosyvoice = [
+    "sherpa-onnx>=1.10.0",
+    "modelscope>=1.18.0",
+    "huggingface-hub>=0.24.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/hugcosmos/book-to-audiobook"
 Repository = "https://github.com/hugcosmos/book-to-audiobook"

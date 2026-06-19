@@ -153,7 +153,7 @@ Examples:
   book2audio convert book.epub -p qwen3_mlx""")
 @click.argument("input_file", required=False, type=click.Path(exists=True))
 @click.option("--chapters", "-c", default=None, help="Chapter range (e.g., '1-5,7,10-')")
-@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx, supertonic")
+@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx, supertonic, cosyvoice")
 @click.option("--voice", "-v", default="vivian", help="Voice name (see 'book2audio doc')")
 @click.option("--language", "-l", default="zh-CN", help="Language code (zh-CN, en-US, ja-JP, etc.)")
 @click.option("--speed", "-s", type=float, default=None, help="Speech speed (0.5-2.0, default: 1.0)")
@@ -203,6 +203,10 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
     if speed is None:
         if effective_provider == "qwen3_mlx":
             speed = settings.qwen3_mlx.speed
+        elif effective_provider == "supertonic":
+            speed = settings.supertonic.speed
+        elif effective_provider == "cosyvoice":
+            speed = settings.cosyvoice.speed
         else:
             speed = 1.0
     console.print(f"[bold blue]Speed:[/bold blue] {speed}x")
@@ -642,13 +646,14 @@ def doc():
         "  -v, --voice NAME       Voice name\n"
         "  -l, --language CODE    Language (zh-CN, en-US, ja-JP, etc.)\n"
         "  -s, --speed FLOAT      Speed 0.5-2.0 (default: 1.0)\n"
-        "      --model-path PATH  Local model path (qwen3_mlx only)\n"
+        "      --model-path PATH  Local model path (qwen3_mlx / cosyvoice)\n"
         "      --book-id ID       Use existing library book\n\n"
         "[bold]Examples:[/bold]\n"
         "  [dim]book2audio convert book.epub[/dim]\n"
         "  [dim]book2audio convert book.epub -c 1-10 -p edge-tts[/dim]\n"
         "  [dim]book2audio convert --book-id abc123 -c 3,5,7[/dim]\n"
-        "  [dim]book2audio convert book.pdf -p qwen3_mlx -l en-US[/dim]",
+        "  [dim]book2audio convert book.pdf -p qwen3_mlx -l en-US[/dim]\n"
+        "  [dim]book2audio convert book.epub -p cosyvoice --model-path ~/models/cosyvoice2[/dim]",
         title="convert",
         border_style="green",
     ))
@@ -738,6 +743,7 @@ def doc():
         "  [bold]edge-tts[/bold]       Free, good quality. Microsoft Edge voices.\n"
         "  [bold]qwen3_mlx[/bold]      Local, Apple Silicon optimized. Needs mlx-audio.\n"
         "  [bold]supertonic[/bold]     Local, ONNX-based, 33 languages. Needs supertonic.\n"
+        "  [bold]cosyvoice[/bold]     Local, ONNX/CPU (sherpa-onnx). Best for low-spec/Intel Mac. Needs sherpa-onnx.\n"
         "  [bold]baidu-tts[/bold]      Baidu API. Requires app_id + api_key.\n"
         "  [bold]iflytek-tts[/bold]    iFlytek API. Requires app_id + api_key + api_secret.\n"
         "  [bold]elevenlabs[/bold]     ElevenLabs API. Requires api_key.\n\n"

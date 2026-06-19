@@ -111,6 +111,17 @@ _ELEVENLABS_VOICES = [
 ]
 
 
+# --- CosyVoice (sherpa-onnx, local CPU) ---
+# CosyVoice2 preset speakers; id is the string form of the sid passed to
+# sherpa_onnx.OfflineTts.generate(text, sid, speed). Multilingual model.
+_COSYVOICE_VOICES = [
+    VoiceInfo("0", "中文女声", VoiceGender.FEMALE, "multi", "cosyvoice", "CosyVoice2 预置 · 中文女声"),
+    VoiceInfo("1", "中文男声", VoiceGender.MALE, "multi", "cosyvoice", "CosyVoice2 预置 · 中文男声"),
+    VoiceInfo("2", "英文女声", VoiceGender.FEMALE, "multi", "cosyvoice", "CosyVoice2 预置 · 英文女声"),
+    VoiceInfo("3", "英文男声", VoiceGender.MALE, "multi", "cosyvoice", "CosyVoice2 预置 · 英文男声"),
+]
+
+
 VOICE_REGISTRY: dict[str, list[VoiceInfo]] = {
     "qwen3_mlx": _QWEN3_VOICES,
     "edge": _EDGE_VOICES,
@@ -118,6 +129,7 @@ VOICE_REGISTRY: dict[str, list[VoiceInfo]] = {
     "iflytek": _IFLYTEK_VOICES,
     "elevenlabs": _ELEVENLABS_VOICES,
     "supertonic": _SUPERTONIC_VOICES,
+    "cosyvoice": _COSYVOICE_VOICES,
 }
 
 

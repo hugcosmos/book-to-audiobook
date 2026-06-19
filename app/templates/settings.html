@@ -24,6 +24,7 @@
                             <option value="iflytek" {{ 'selected' if tts_default_provider == 'iflytek' }}>iFlytek</option>
                             <option value="elevenlabs" {{ 'selected' if tts_default_provider == 'elevenlabs' }}>ElevenLabs</option>
                             <option value="supertonic" {{ 'selected' if tts_default_provider == 'supertonic' }}>Supertonic (Local · 31 langs)</option>
+                            <option value="cosyvoice" {{ 'selected' if tts_default_provider == 'cosyvoice' }}>CosyVoice (Local · ONNX/CPU)</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -37,8 +38,8 @@
         </div>
 
         <!-- Provider-specific configs -->
-        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q', 'supertonic': 'S'} %}
-        {% set field_labels = {'total_steps': 'Quality Steps', 'chunk_max_chars': 'Max Chars per Chunk', 'chunk_max_seconds': 'Max Chunk Duration', 'speed': 'Speed', 'model_name': 'Model Name', 'model_id': 'Model ID', 'app_id': 'App ID', 'api_key': 'API Key', 'secret_key': 'Secret Key', 'api_secret': 'API Secret'} %}
+        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q', 'supertonic': 'S', 'cosyvoice': 'C'} %}
+        {% set field_labels = {'total_steps': 'Quality Steps', 'chunk_max_chars': 'Max Chars per Chunk', 'chunk_max_seconds': 'Max Chunk Duration', 'speed': 'Speed', 'model_name': 'Model Name', 'model_id': 'Model ID', 'app_id': 'App ID', 'api_key': 'API Key', 'secret_key': 'Secret Key', 'api_secret': 'API Secret', 'model_dir': 'Model Directory', 'num_threads': 'CPU Threads', 'download_source': 'Model Download Source'} %}
         {% for section, config in provider_configs.items() %}
         <div class="settings-card" data-provider-section="{{ section }}">
             <div class="settings-card-header">
@@ -49,6 +50,8 @@
                 {% elif section == 'qwen3_mlx' %}
                 <span class="provider-badge badge-local">Local</span>
                 {% elif section == 'supertonic' %}
+                <span class="provider-badge badge-local">Local</span>
+                {% elif section == 'cosyvoice' %}
                 <span class="provider-badge badge-local">Local</span>
                 {% else %}
                 <span class="provider-badge badge-api">API Key Required</span>
@@ -82,6 +85,16 @@
                         </select>
                         {% elif 'chunk_max_chars' in field %}
                         <input type="number" name="{{ section }}.{{ field }}" value="{{ value }}" min="100" max="1000" step="50" class="settings-input">
+                        {% elif 'num_threads' in field %}
+                        <input type="number" name="{{ section }}.{{ field }}" value="{{ value }}" min="1" max="16" step="1" class="settings-input">
+                        {% elif 'model_dir' in field %}
+                        <input type="text" name="{{ section }}.{{ field }}" value="{{ value }}" class="settings-input full-width" placeholder="Empty = auto-download to ~/.cache/book2audio/cosyvoice2">
+                        {% elif 'download_source' in field %}
+                        <select name="{{ section }}.{{ field }}" class="settings-input">
+                            <option value="auto" {{ 'selected' if value == 'auto' or not value }}>Auto (ModelScope → HuggingFace)</option>
+                            <option value="modelscope" {{ 'selected' if value == 'modelscope' }}>ModelScope (recommended in China)</option>
+                            <option value="huggingface" {{ 'selected' if value == 'huggingface' }}>HuggingFace</option>
+                        </select>
                         {% else %}
                         <input type="text" name="{{ section }}.{{ field }}" value="{{ value }}" class="settings-input" placeholder="{{ field | replace('_', ' ') }}">
                         {% endif %}
@@ -145,7 +158,7 @@
                     </div>
                 </div>
                 {% endif %}
-                {% if section != 'qwen3_mlx' and section != 'supertonic' %}
+                {% if section != 'qwen3_mlx' and section != 'supertonic' and section != 'cosyvoice' %}
                 <div class="voice-add-form">
                     <h4>Add Custom Voice (manual)</h4>
                     <div class="voice-add-fields">
