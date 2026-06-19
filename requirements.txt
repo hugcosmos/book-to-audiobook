@@ -8,6 +8,7 @@ beautifulsoup4>=4.12
 lxml>=5.0
 pdfplumber>=0.11.0
 pydub>=0.25.1
+audioop-lts>=0.2.0; python_version >= "3.13"  # audioop removed in 3.13 (PEP 594)
 sentencex>=0.6.0
 aiofiles>=24.0
 soundfile>=0.12.1

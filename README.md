@@ -10,30 +10,31 @@ Convert ebooks (EPUB, MOBI, AZW3, PDF, TXT) to audiobooks (M4B / MP3) with chapt
 
 ## Install
 
-It's strongly recommended to install into an isolated environment so this
-project's dependencies don't conflict with other tools on your system.
+Create an isolated environment first to avoid dependency conflicts:
 
-**With venv (Python 3.11+):**
+**venv (Python 3.11+):**
 
 ```bash
 python3.13 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 ```
 
-**With conda:**
+**conda:**
 
 ```bash
 conda create -n book2audio python=3.13 -y
 conda activate book2audio
 ```
 
-Then install:
+Then choose one:
+
+**From PyPI:**
 
 ```bash
 pip install book-to-audiobook
 ```
 
-From source:
+**From source:**
 
 ```bash
 git clone https://github.com/hugcosmos/book-to-audiobook.git
