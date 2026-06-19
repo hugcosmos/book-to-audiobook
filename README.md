@@ -109,7 +109,8 @@ Set via Settings page or `book2audio config set qwen3_mlx.model_name <model>`.
 On-device, 33 languages, no API key. Works on any platform (CPU/GPU).
 
 ```bash
-pip install supertonic
+pip install "book-to-audiobook[supertonic]"
+# or directly: pip install supertonic
 ```
 
 10 built-in voices (5 male, 5 female). Supports English, Japanese, Korean, Arabic, German, French, Spanish, Russian, and 24 more languages.
