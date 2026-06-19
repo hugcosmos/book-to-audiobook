@@ -58,6 +58,8 @@ class ElevenLabsTTSProvider(BaseTTSProvider):
 
         merged = AudioSegment.empty()
         for i, chunk in enumerate(chunks):
+            if cancelled and cancelled():
+                raise asyncio.CancelledError("Conversion cancelled")
             log.info("ElevenLabs chunk %d/%d", i + 1, len(chunks))
             audio_bytes = await self._synthesize_single(chunk)
             tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
@@ -65,6 +67,8 @@ class ElevenLabsTTSProvider(BaseTTSProvider):
             tmp.close()
             merged += AudioSegment.from_mp3(tmp.name)
             os.unlink(tmp.name)
+            if progress:
+                progress(i + 1, len(chunks))
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         merged.export(str(output_path), format="mp3")
@@ -113,7 +117,8 @@ class ElevenLabsTTSProvider(BaseTTSProvider):
                     attempt + 1, self.max_retries, e,
                 )
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    import random
+                    await asyncio.sleep(2 ** attempt + random.uniform(0, 0.5))
                 else:
                     raise
 

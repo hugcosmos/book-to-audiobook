@@ -12,6 +12,15 @@ router = APIRouter()
 # Cover images served from uploads dir
 _COVER_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".gif"}
 
+# Filename prefixes that mark intermediate/transient artifacts, not user-facing
+# outputs. These must never be served by the generic download route (a stale
+# combined_temp.mp3 from a failed run could otherwise be returned as "the mp3").
+_INTERMEDIATE_PREFIXES = ("_tmp_", "combined_temp", "_concat_")
+
+
+def _is_intermediate(name: str) -> bool:
+    return name.startswith(_INTERMEDIATE_PREFIXES)
+
 
 @router.get("/download/{book_id}/{fmt}")
 async def download_file(book_id: str, fmt: str):
@@ -19,10 +28,16 @@ async def download_file(book_id: str, fmt: str):
     if not out_dir.exists():
         raise HTTPException(404, "Output not found")
     if fmt == "m4b":
-        files = list(out_dir.glob("*.m4b"))
+        files = [f for f in out_dir.glob("*.m4b") if not _is_intermediate(f.name)]
+        # Prefer the combined/whole-book m4b over any per-chapter artifact.
+        files.sort(key=lambda f: _is_intermediate(f.name))
     elif fmt == "mp3":
-        files = list(out_dir.glob("*.mp3"))
-        files = [f for f in files if not f.name.startswith("_tmp_")]
+        all_mp3 = [f for f in out_dir.glob("*.mp3") if not _is_intermediate(f.name)]
+        # Per-chapter MP3s now carry an index segment
+        # ("Book - 0001 - Title.mp3"); the combined output does not. Prefer the
+        # combined file so "download mp3" yields the whole book, not one chapter.
+        combined = [f for f in all_mp3 if " - " not in f.stem]
+        files = combined or all_mp3
     else:
         raise HTTPException(400, "Invalid format. Use 'm4b' or 'mp3'.")
     if not files:

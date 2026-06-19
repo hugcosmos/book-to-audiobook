@@ -91,7 +91,19 @@ class PdfParser(BaseBookParser):
             return heading_chapters
         # 3. Fallback: page-based splitting
         log.info("PDF: falling back to page-based splitting")
-        return self._chapters_from_pages()
+        chapters = self._chapters_from_pages()
+        if not chapters:
+            # No extractable text at all — almost certainly a scanned/image PDF.
+            # Raise explicitly so the user gets an actionable error instead of a
+            # silently empty book with zero chapters.
+            total_chars = sum(len(t) for t in self._page_text_cache.values())
+            raise ValueError(
+                "PDF contains no extractable text (possibly a scanned/image-only "
+                f"PDF; {len(self.pdf.pages)} pages, {total_chars} chars extracted). "
+                "OCR is not supported — please provide a text-based PDF or an "
+                "EPUB/TXT version."
+            )
+        return chapters
 
     def _extract_page_text(self, page: pdfplumber.page.Page) -> str:
         """Extract text from a single page, filtering noise."""

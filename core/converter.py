@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -99,6 +100,10 @@ class Converter:
             unique = sorted(set(samples))
             book.detected_language = ",".join(unique)
             log.info("Detected language for %s: %s", book.id, book.detected_language)
+            # Persist so detection doesn't re-run on every startup (it reads up
+            # to 5 chapter files and runs per book, which slows startup for a
+            # large library when never saved).
+            self._save_book(book)
 
     def add_book(self, book: BookMetadata) -> None:
         self._detect_and_save_language(book)
@@ -159,6 +164,11 @@ class Converter:
 
     def discard_task(self, book_id: str) -> None:
         """Discard a cancelled/failed task, its manifest and output files."""
+        # Cancel and drop any lingering async task so it can't keep writing to
+        # the output dir we're about to remove.
+        task = self._tasks.pop(book_id, None)
+        if task and not task.done():
+            task.cancel()
         self._jobs.pop(book_id, None)
         self._cancel_flags.pop(book_id, None)
         self._resumable.pop(book_id, None)
@@ -195,7 +205,12 @@ class Converter:
     def _write_manifest(self, manifest: ConversionManifest) -> None:
         path = self._manifest_path(manifest.book_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+        # Atomic write: write to a temp file then os.replace into place. A crash
+        # mid-write_text would otherwise leave a truncated _conversion.json that
+        # fails to parse on next startup, dropping the book from _resumable.
+        tmp_path = path.with_suffix(".json.tmp")
+        tmp_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
+        os.replace(tmp_path, path)
 
     def _load_manifest(self, book_id: str) -> ConversionManifest | None:
         path = self._manifest_path(book_id)
@@ -216,7 +231,7 @@ class Converter:
                 manifest = ConversionManifest.model_validate_json(
                     manifest_path.read_text(encoding="utf-8")
                 )
-                if manifest.state in ("running", "failed") and manifest.book_id in self._books:
+                if manifest.state in ("running", "failed", "cancelled") and manifest.book_id in self._books:
                     self._resumable[manifest.book_id] = manifest
                     log.info(
                         "Resumable conversion found: %s (%d/%d chapters done)",
@@ -268,6 +283,10 @@ class Converter:
                 if not (out_dir / combined_name).exists():
                     needs_merge = True
             if not needs_merge:
+                # Clean up the on-disk manifest so this entry does not reappear
+                # in _resumable on every restart and trap the user in a loop.
+                manifest_path = self._manifest_path(book_id)
+                manifest_path.unlink(missing_ok=True)
                 raise ValueError("All chapters already completed")
         request = ConversionRequest(
             book_id=book_id,
@@ -300,6 +319,9 @@ class Converter:
             self._jobs.pop(book_id, None)
             self._cancel_flags.pop(book_id, None)
             self._resumable.pop(book_id, None)
+            stale_task = self._tasks.pop(book_id, None)
+            if stale_task and not stale_task.done():
+                stale_task.cancel()
         status = ConversionStatus(
             book_id=book_id,
             state="pending",
@@ -342,7 +364,12 @@ class Converter:
             if completed_indices:
                 for ch in book.chapters:
                     if ch.index in completed_indices:
-                        named_mp3 = out_dir / self._safe_filename(f"{book.title} - {ch.title}.mp3")
+                        named_mp3 = self._chapter_mp3_path(out_dir, book.title, ch)
+                        # Migrate pre-1.4 naming (no index) -> new naming if present.
+                        legacy_mp3 = self._legacy_chapter_mp3_path(out_dir, book.title, ch)
+                        if not named_mp3.exists() and legacy_mp3.exists():
+                            legacy_mp3.rename(named_mp3)
+                            log.info("Migrated legacy chapter MP3: %s -> %s", legacy_mp3.name, named_mp3.name)
                         if named_mp3.exists():
                             chapter_files.append((ch, named_mp3))
                         else:
@@ -381,6 +408,23 @@ class Converter:
                 text = TextProcessor.clean(chapter.text)
                 log.info(f"Cleaned text length: {len(text)}")
 
+                # Skip chapters that are empty after cleaning (e.g. all-whitespace,
+                # or only endnote markers). Synthesizing them would raise inside
+                # the provider and fail the *whole* conversion; instead skip the
+                # chapter and mark it handled so resume does not retry it.
+                if not text.strip():
+                    log.warning(
+                        "Chapter %d ('%s') is empty after cleaning — skipping synthesis",
+                        chapter.index, chapter.title,
+                    )
+                    status.completed_chapters = base_completed + i + 1
+                    status.progress_percent = (base_completed + i + 1) / total_all * 100
+                    status.current_chapter = chapter.title
+                    if chapter.index not in manifest.completed_chapters:
+                        manifest.completed_chapters.append(chapter.index)
+                    self._write_manifest(manifest)
+                    continue
+
                 # Show current chapter immediately
                 status.current_chapter = f"{chapter.title} (preparing...)"
 
@@ -401,7 +445,12 @@ class Converter:
                         )
                     return cb
 
-                named_mp3 = out_dir / self._safe_filename(f"{book.title} - {chapter.title}.mp3")
+                named_mp3 = self._chapter_mp3_path(out_dir, book.title, chapter)
+                # Migrate pre-1.4 naming (no index) -> new naming if present.
+                legacy_mp3 = self._legacy_chapter_mp3_path(out_dir, book.title, chapter)
+                if not named_mp3.exists() and legacy_mp3.exists():
+                    legacy_mp3.rename(named_mp3)
+                    log.info("Migrated legacy chapter MP3: %s -> %s", legacy_mp3.name, named_mp3.name)
                 temp_mp3 = out_dir / f"_tmp_{chapter.index:04d}.mp3"
                 if named_mp3.exists() and named_mp3.stat().st_size > 0:
                     log.info("Skipping chapter %d, MP3 already exists: %s", chapter.index, named_mp3.name)
@@ -409,7 +458,8 @@ class Converter:
                     status.completed_chapters = base_completed + i + 1
                     status.progress_percent = (base_completed + i + 1) / total_all * 100
                     status.current_chapter = chapter.title
-                    manifest.completed_chapters.append(chapter.index)
+                    if chapter.index not in manifest.completed_chapters:
+                        manifest.completed_chapters.append(chapter.index)
                     self._write_manifest(manifest)
                     continue
                 if temp_mp3.exists() and temp_mp3.stat().st_size > 0:
@@ -419,21 +469,31 @@ class Converter:
                     status.completed_chapters = base_completed + i + 1
                     status.progress_percent = (base_completed + i + 1) / total_all * 100
                     status.current_chapter = chapter.title
-                    manifest.completed_chapters.append(chapter.index)
+                    if chapter.index not in manifest.completed_chapters:
+                        manifest.completed_chapters.append(chapter.index)
                     self._write_manifest(manifest)
                     continue
-                log.info(f"Starting TTS synthesis to: {temp_mp3}")
+                log.info(f"Starting TTS synthesis to: %s", temp_mp3)
                 cancel_check = lambda: self._cancel_flags.get(book_id, False)
                 await tts.synthesize(text, temp_mp3, progress=make_progress_cb(i, len(selected), base_completed, total_all), cancelled=cancel_check)
+                # Validate synthesized audio before promoting to final chapter MP3.
+                # A 0-byte / truncated / non-audio file would otherwise be silently
+                # treated as a completed chapter and merged into the output.
+                from utils.ffmpeg_utils import validate_audio
+                if not validate_audio(temp_mp3):
+                    raise RuntimeError(
+                        f"Chapter {chapter.index} ('{chapter.title}') produced "
+                        f"invalid or empty audio: {temp_mp3.name}"
+                    )
                 # Rename temp to final named MP3
-                if temp_mp3.exists():
-                    temp_mp3.rename(named_mp3)
+                temp_mp3.rename(named_mp3)
                 chapter_files.append((chapter, named_mp3))
                 status.completed_chapters = base_completed + i + 1
                 status.progress_percent = (base_completed + i + 1) / total_all * 100
                 status.current_chapter = chapter.title
                 # Update manifest after each chapter
-                manifest.completed_chapters.append(chapter.index)
+                if chapter.index not in manifest.completed_chapters:
+                    manifest.completed_chapters.append(chapter.index)
                 self._write_manifest(manifest)
                 log.info(
                     "Chapter %d/%d done: %s",
@@ -506,6 +566,21 @@ class Converter:
         for ch in ('/', '\\', ':', '*', '?', '"', '<', '>', '|'):
             name = name.replace(ch, '-')
         return name[:200]
+
+    def _chapter_mp3_path(self, out_dir: Path, book_title: str, chapter: Chapter) -> Path:
+        """Canonical per-chapter MP3 path.
+
+        Includes the chapter index so two chapters whose titles collapse to the
+        same string (CJK titles differing only in stripped punctuation, duplicate
+        "Chapter 1" headings, etc.) can no longer overwrite each other's audio.
+        """
+        safe_title = self._safe_filename(chapter.title)
+        safe_book = self._safe_filename(book_title)
+        return out_dir / self._safe_filename(f"{safe_book} - {chapter.index:04d} - {safe_title}.mp3")
+
+    def _legacy_chapter_mp3_path(self, out_dir: Path, book_title: str, chapter: Chapter) -> Path:
+        """Pre-1.4 naming (no index) — used only to migrate old files on resume."""
+        return out_dir / self._safe_filename(f"{book_title} - {chapter.title}.mp3")
 
     @staticmethod
     def _combined_label(selected: list[Chapter], book: BookMetadata) -> str:

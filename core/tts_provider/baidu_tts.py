@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import time
 from pathlib import Path
-from urllib.parse import quote_plus
 
 import httpx
 import numpy as np
@@ -86,7 +85,9 @@ class BaiduTTSProvider(BaseTTSProvider):
         import tempfile, os
 
         merged = AudioSegment.empty()
-        for chunk in chunks:
+        for i, chunk in enumerate(chunks):
+            if cancelled and cancelled():
+                raise asyncio.CancelledError("Conversion cancelled")
             audio_bytes = await self._synthesize_single(chunk)
             # Baidu returns MP3 when aue=3
             tmp = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
@@ -94,6 +95,8 @@ class BaiduTTSProvider(BaseTTSProvider):
             tmp.close()
             merged += AudioSegment.from_mp3(tmp.name)
             os.unlink(tmp.name)
+            if progress:
+                progress(i + 1, len(chunks))
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         merged.export(str(output_path), format="mp3")
@@ -104,14 +107,17 @@ class BaiduTTSProvider(BaseTTSProvider):
         token = await self._get_access_token()
 
         url = "https://tsn.baidu.com/text2audio"
+        # Baidu spd (speech rate) range is [1, 15], where 5 is normal speed.
+        # Map the normalized config.speed (1.0 == normal) onto that range.
+        spd = max(1, min(15, int(round(5 * self.config.speed))))
         payload = {
-            "tex": quote_plus(text),
+            "tex": text,  # httpx form-encodes the body; do not pre-encode
             "tok": token,
             "cuid": "book-to-audiobook",
             "ctp": 1,
             "lan": self._get_lan(),
             "per": int(self.config.voice),
-            "spd": 5,
+            "spd": spd,
             "pit": 5,
             "vol": 5,
             "aue": 3,  # mp3
@@ -137,7 +143,8 @@ class BaiduTTSProvider(BaseTTSProvider):
                     attempt + 1, self.max_retries, e,
                 )
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    import random
+                    await asyncio.sleep(2 ** attempt + random.uniform(0, 0.5))
                 else:
                     raise
 

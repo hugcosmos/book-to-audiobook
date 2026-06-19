@@ -93,7 +93,8 @@ class EdgeTTSProvider(BaseTTSProvider):
                     e,
                 )
                 if attempt < self.max_retries - 1:
-                    await asyncio.sleep(2**attempt)
+                    import random
+                    await asyncio.sleep(2 ** attempt + random.uniform(0, 0.5))
                 else:
                     raise
 

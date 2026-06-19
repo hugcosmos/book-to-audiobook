@@ -44,11 +44,40 @@ class TextProcessor:
 
     @staticmethod
     def clean(text: str, remove_endnotes: bool = True) -> str:
+        if not text:
+            return ""
+        # 1. Strip HTML tags (escaped entities first, then raw tags). EPUB
+        #    extraction mostly uses get_text(), but TXT chapters or edited text
+        #    may carry stray markup that TTS would otherwise read aloud.
+        text = re.sub(r"&nbsp;", " ", text)
+        text = re.sub(r"&[a-zA-Z]+;", " ", text)
+        text = re.sub(r"<[^>]+>", "", text)
+        # 2. Strip Markdown formatting so it isn't spoken verbatim.
+        text = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", text)          # images
+        text = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", text)       # links -> label
+        text = re.sub(r"^#{1,6}\s*", "", text, flags=re.MULTILINE) # headings
+        text = re.sub(r"`{1,3}", "", text)                         # inline/code fences
+        text = re.sub(r"\*{1,2}|_{1,2}", "", text)                 # bold/italic markers
+        text = re.sub(r"^[\s]*[-*+]\s+", "", text, flags=re.MULTILINE)  # list bullets
+        text = re.sub(r"^[\s]*\d+\.\s+", "", text, flags=re.MULTILINE)  # numbered lists
+        # 3. Strip bare URLs and emails (they read badly character-by-character).
+        text = re.sub(r"https?://\S+", "", text)
+        text = re.sub(r"\b[\w.+-]+@[\w-]+\.[\w.-]+\b", "", text)
+        # 4. Normalize typographic punctuation to ASCII forms some engines handle
+        #    more reliably, and replace NBSP.
+        text = text.replace("\u00a0", " ")
+        text = text.replace("\u201c", '"').replace("\u201d", '"')   # “ ”
+        text = text.replace("\u2018", "'").replace("\u2019", "'")   # ‘ ’
+        text = text.replace("\u2013", "-").replace("\u2014", "-")   # – —
+        text = text.replace("\u2026", "...")                         # …
+        # 5. Remove control characters (after the above so we don't clobber them).
         text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
         text = re.sub(r"\s+", " ", text).strip()
+        # 6. Endnote/footnote markers. Strip short numeric references ([1], (12))
+        #    that follow a word, but keep 4-digit values like years "(1990)".
         if remove_endnotes:
-            text = re.sub(r"\[\d+\]", "", text)
-            text = re.sub(r"\(\d+\)", "", text)
+            text = re.sub(r"(?<=\w)\s*\[\d{1,3}\]", "", text)
+            text = re.sub(r"(?<=\w)\s*\(\d{1,3}\)", "", text)
         return text
 
     @staticmethod

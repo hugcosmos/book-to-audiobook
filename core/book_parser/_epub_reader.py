@@ -34,6 +34,7 @@ class EpubItem:
     properties: str = ""
     _zip: zipfile.ZipFile = field(repr=False, default=None)
     _opf_dir: str = field(repr=False, default="")
+    _cached_content: bytes | None = field(repr=False, default=None)
 
     @property
     def zip_path(self) -> str:
@@ -51,6 +52,10 @@ class EpubItem:
         return self.media_type.startswith("image/")
 
     def get_content(self) -> bytes:
+        # Return cached bytes if the zip has been closed (content pre-extracted
+        # in read_epub). Otherwise read lazily from the still-open zip.
+        if self._cached_content is not None:
+            return self._cached_content
         return self._zip.read(self.zip_path)
 
     def get_name(self) -> str:
@@ -96,51 +101,69 @@ class EpubBook:
 
 
 def read_epub(path: str | Path) -> EpubBook:
-    """Parse an EPUB file and return an EpubBook."""
-    zf = zipfile.ZipFile(str(path))
-    book = EpubBook(_zip=zf)
+    """Parse an EPUB file and return an EpubBook.
 
-    # 1. Find OPF path from container.xml
-    container_xml = zf.read("META-INF/container.xml")
-    container = etree.fromstring(container_xml)
-    opf_path = container.find(".//c:rootfile", _NS_CONTAINER).get("full-path")
-    opf_dir = os.path.dirname(opf_path)
+    Opens the zip with a context manager and pre-extracts every manifest
+    item's content into the item's cache before closing, so the returned
+    EpubBook holds no open file descriptor. This avoids leaking a ZipFile FD
+    on every parse (get_chapter_text re-parses on demand, which over a long
+    session could exhaust the FD limit).
+    """
+    with zipfile.ZipFile(str(path)) as zf:
+        book = EpubBook(_zip=zf)
 
-    # 2. Parse content.opf
-    opf_xml = zf.read(opf_path)
-    opf = etree.fromstring(opf_xml)
+        # 1. Find OPF path from container.xml
+        container_xml = zf.read("META-INF/container.xml")
+        container = etree.fromstring(container_xml)
+        opf_path = container.find(".//c:rootfile", _NS_CONTAINER).get("full-path")
+        opf_dir = os.path.dirname(opf_path)
 
-    # 2a. Metadata
-    for elem in opf.iter("{%s}creator" % _NS_DC["dc"]):
-        _add_meta(book, "DC", "creator", elem.text or "")
-    for elem in opf.iter("{%s}title" % _NS_DC["dc"]):
-        _add_meta(book, "DC", "title", elem.text or "")
-    for elem in opf.iter("{%s}author" % _NS_DC["dc"]):
-        _add_meta(book, "DC", "author", elem.text or "")
+        # 2. Parse content.opf
+        opf_xml = zf.read(opf_path)
+        opf = etree.fromstring(opf_xml)
 
-    # 2b. Manifest → items
-    for item_elem in opf.iter("{%s}item" % _NS_OPF["opf"]):
-        item = EpubItem(
-            id=item_elem.get("id", ""),
-            href=item_elem.get("href", ""),
-            media_type=item_elem.get("media-type", ""),
-            properties=item_elem.get("properties", ""),
-            _zip=zf,
-            _opf_dir=opf_dir,
-        )
-        book.manifest[item.id] = item
+        # 2a. Metadata
+        for elem in opf.iter("{%s}creator" % _NS_DC["dc"]):
+            _add_meta(book, "DC", "creator", elem.text or "")
+        for elem in opf.iter("{%s}title" % _NS_DC["dc"]):
+            _add_meta(book, "DC", "title", elem.text or "")
+        for elem in opf.iter("{%s}author" % _NS_DC["dc"]):
+            _add_meta(book, "DC", "author", elem.text or "")
 
-    # 2c. Spine → ordered items
-    for itemref in opf.iter("{%s}itemref" % _NS_OPF["opf"]):
-        idref = itemref.get("idref", "")
-        item = book.manifest.get(idref)
-        if item:
-            book.spine.append(item)
+        # 2b. Manifest → items
+        for item_elem in opf.iter("{%s}item" % _NS_OPF["opf"]):
+            item = EpubItem(
+                id=item_elem.get("id", ""),
+                href=item_elem.get("href", ""),
+                media_type=item_elem.get("media-type", ""),
+                properties=item_elem.get("properties", ""),
+                _zip=zf,
+                _opf_dir=opf_dir,
+            )
+            book.manifest[item.id] = item
 
-    # 3. Parse TOC
-    _parse_toc(book, zf, opf, opf_dir)
+        # 2c. Spine → ordered items
+        for itemref in opf.iter("{%s}itemref" % _NS_OPF["opf"]):
+            idref = itemref.get("idref", "")
+            item = book.manifest.get(idref)
+            if item:
+                book.spine.append(item)
 
-    return book
+        # 3. Parse TOC
+        _parse_toc(book, zf, opf, opf_dir)
+
+        # 4. Pre-extract all item contents into memory, so we can close the zip.
+        #    EPUBs are typically a few MB; this trades a little RAM for not
+        #    leaking file descriptors and not re-decompressing on repeated reads.
+        for item in book.manifest.values():
+            try:
+                item._cached_content = zf.read(item.zip_path)
+            except KeyError:
+                # Some manifest entries (e.g. #anchor-only hrefs) have no real
+                # zip entry; leave them uncached and let get_content() handle it.
+                item._cached_content = b""
+
+        return book
 
 
 def _add_meta(book: EpubBook, ns: str, tag: str, value: str) -> None:
@@ -191,7 +214,14 @@ def _parse_ncx(book: EpubBook, ncx_xml: bytes) -> None:
 
 
 def _parse_nav(book: EpubBook, nav_xml: bytes) -> None:
-    """Parse EPUB3 nav.xhtml → flat list of top-level toc entries."""
+    """Parse EPUB3 nav.xhtml → flat list of top-level toc entries.
+
+    Only direct-child ``<li>`` of the toc ``<nav>``'s ``<ol>`` are used, so that
+    nested landmark / page-list navs (Cover, Copyright, page numbers) are not
+    mistaken for chapter titles. The first ``<a>`` of each top-level li is the
+    chapter link; nested sub-chapters under that li are intentionally flattened
+    by recursing one level.
+    """
     doc = etree.fromstring(nav_xml)
     # Find <nav epub:type="toc">
     toc_nav = None
@@ -200,16 +230,36 @@ def _parse_nav(book: EpubBook, nav_xml: bytes) -> None:
             toc_nav = nav
             break
     if toc_nav is None:
-        # Fallback: first <nav>
-        toc_nav = doc.find(".//{%s}nav" % _NS_XHTML["x"])
+        # Fallback: first <nav> — but only if it has an <ol> (skip pure
+        # landmark/page-list navs which use <ol hidden> or no <ol>).
+        for nav in doc.iter("{%s}nav" % _NS_XHTML["x"]):
+            if nav.find(".//{%s}ol" % _NS_XHTML["x"]) is not None:
+                toc_nav = nav
+                break
     if toc_nav is None:
         return
 
-    # Top-level <li> items only
-    for li in toc_nav.iter("{%s}li" % _NS_XHTML["x"]):
-        a = li.find("{%s}a" % _NS_XHTML["x"])
-        if a is not None:
-            title = (a.text or "").strip()
-            href = a.get("href", "")
-            if title and href:
-                book.toc.append(TocEntry(title=title, href=href))
+    xhtml = _NS_XHTML["x"]
+
+    def _collect_entries(ol_element, depth=0):
+        # Only direct-child <li> of this <ol>; recursion handles nested <ol>
+        # inside an <li> (sub-chapters), but we cap depth to avoid runaway.
+        if depth > 3:
+            return
+        for li in ol_element.iterfind("x:li", _NS_XHTML):
+            a = li.find("x:a", _NS_XHTML)
+            if a is not None:
+                title = (a.text or "").strip()
+                href = a.get("href", "")
+                if title and href:
+                    book.toc.append(TocEntry(title=title, href=href))
+            nested_ol = li.find("x:ol", _NS_XHTML)
+            if nested_ol is not None:
+                _collect_entries(nested_ol, depth + 1)
+
+    top_ol = toc_nav.find("x:ol", _NS_XHTML)
+    if top_ol is None:
+        # Some navs wrap the ol differently; fall back to first descendant ol.
+        top_ol = toc_nav.find(".//x:ol", _NS_XHTML)
+    if top_ol is not None:
+        _collect_entries(top_ol)

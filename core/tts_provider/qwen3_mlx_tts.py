@@ -102,6 +102,12 @@ class Qwen3MLXTTSProvider(BaseTTSProvider):
             if item is None:
                 break
             text, voice, lang_code, async_future, loop, kwargs = item
+            # Skip work whose caller already cancelled (e.g. task.cancel() during
+            # synthesis). We cannot interrupt an in-flight generate(), but we can
+            # avoid spending GPU time on queued chunks nobody is awaiting, so a
+            # cancel stays responsive for any not-yet-started chunks.
+            if async_future.cancelled():
+                continue
             try:
                 # Dynamic max_tokens based on estimated speech duration.
                 # At 12.5Hz codec, estimated_sec * 12.5 = core tokens.

@@ -3,11 +3,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from config.settings import settings
 from core.book_parser.base_parser import BaseBookParser
 from core.models import BookFormat, BookMetadata, Chapter
 from core.text_processor import TextProcessor
-from utils.log import log
 
 CHAPTER_PATTERN = re.compile(
     r"^(chapter\s+\d+|part\s+\d+|第[一二三四五六七八九十百千\d]+[章节回]|卷[一二三四五六七八九十百千\d]+)",
@@ -44,6 +42,20 @@ class TxtParser(BaseBookParser):
 
     def _parse_with_pattern(self, splits: list[str]) -> list[Chapter]:
         chapters = []
+        # splits[0] is any text before the first chapter heading (preface,
+        # foreword, intro). If non-trivial, keep it as its own chapter so that
+        # content is not silently dropped.
+        preamble = re.sub(r"\s+", " ", splits[0]).strip()
+        if len(preamble) >= 50:
+            chapters.append(
+                Chapter(
+                    index=0,
+                    title="序",
+                    text=preamble,
+                    char_count=len(preamble),
+                    estimated_duration_seconds=TextProcessor.estimate_speech_duration(preamble),
+                )
+            )
         i = 1
         while i < len(splits):
             title = splits[i].strip()
@@ -92,7 +104,9 @@ class TxtParser(BaseBookParser):
                     title=f"Section {len(chapters) + 1}",
                     text=text,
                     char_count=len(text),
-                    estimated_duration_seconds=len(text) / settings.tts.chars_per_second,
+                    # Use the same estimator as every other section (was a
+                    # divergent len()/chars_per_second formula before).
+                    estimated_duration_seconds=TextProcessor.estimate_speech_duration(text),
                 )
             )
         return chapters

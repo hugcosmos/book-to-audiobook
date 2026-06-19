@@ -108,8 +108,17 @@ class SupertonicTTSProvider(BaseTTSProvider):
         if progress:
             progress(len(chunks), len(chunks))
 
-        # Concatenate all chunks
-        combined = np.concatenate(all_audio, axis=1)
+        # Concatenate all chunks. Normalize each to 2-D shape first: a chunk may
+        # come back as 1-D (mono) or with mismatched dimensions, which would
+        # otherwise make np.concatenate(axis=1) raise *after* all chunks were
+        # synthesized, wasting the whole chapter's work.
+        normalized: list[np.ndarray] = []
+        for wav in all_audio:
+            arr = np.asarray(wav)
+            if arr.ndim == 1:
+                arr = arr.reshape(1, -1)
+            normalized.append(arr)
+        combined = np.concatenate(normalized, axis=1)
 
         # WAV → MP3 via pydub
         output_path.parent.mkdir(parents=True, exist_ok=True)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class BookFormat(str, Enum):
@@ -84,4 +84,13 @@ class ConversionManifest(BaseModel):
     tts_config: TTSConfig = Field(default_factory=TTSConfig)
     output_m4b: bool = True
     output_mp3: bool = True
-    state: str = "running"  # running | completed | failed
+    state: str = "running"  # running | completed | failed | cancelled
+
+    @field_validator("completed_chapters", mode="after")
+    @classmethod
+    def _dedup_completed(cls, v: list[int]) -> list[int]:
+        # Preserve order, drop duplicate chapter indices. The resume flow seeds
+        # completed_chapters from a prior manifest and appends on every skip /
+        # completion path; without dedup, repeated resume cycles accumulate
+        # duplicate indices and corrupt progress tracking.
+        return list(dict.fromkeys(v))
