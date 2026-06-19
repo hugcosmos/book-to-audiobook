@@ -22,6 +22,19 @@ cd book-to-audiobook
 pip install -e .
 ```
 
+The default install pulls in a working local TTS engine for your platform:
+**Qwen3 MLX on Apple Silicon** (arm64 macOS), **CosyVoice on every other platform**
+(Intel Mac / Windows / Linux, runs on CPU via sherpa-onnx). No extra step needed
+for the default provider — it matches the platform-aware default selected at
+runtime. Cloud providers (Edge/Baidu/iFlytek/ElevenLabs) only need their API keys.
+
+### Optional local providers
+
+- **Supertonic** (ONNX, 33 languages): `pip install "book-to-audiobook[supertonic]"`
+  (not default — pulls in onnxruntime, which lacks wheels on some Python versions)
+- **CosyVoice on Apple Silicon** (if you want it alongside Qwen3 MLX):
+  `pip install "book-to-audiobook[cosyvoice]"`
+
 ## Quick Start
 
 ```bash
