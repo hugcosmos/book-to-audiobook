@@ -38,11 +38,48 @@ _engine_lock = asyncio.Lock()
 
 
 def _download_file(url: str, dest: Path) -> None:
-    """Download a file with a simple progress log."""
+    """Download a file via httpx streaming with progress feedback.
+
+    Uses httpx (already a project dependency) for HTTP/2, connection reuse, and
+    faster downloads than urllib.  Falls back to urllib if httpx is unavailable.
+    """
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        import httpx
+        _download_httpx(url, dest)
+    except ImportError:
+        _download_urllib(url, dest)
+    log.info("Downloaded %s (%.1f MB)", Path(url).name, dest.stat().st_size / 1e6)
+
+
+def _download_httpx(url: str, dest: Path) -> None:
+    """Stream a file with httpx for better throughput."""
+    import httpx
+
+    name = Path(url).name
+    with httpx.Client(http2=True, follow_redirects=True, timeout=600) as client:
+        with client.stream("GET", url) as resp:
+            resp.raise_for_status()
+            total = int(resp.headers.get("content-length", 0))
+            log.info("Downloading %s (%.1f MB)", name, total / 1e6)
+
+            tmp = dest.with_suffix(dest.suffix + ".part")
+            downloaded = 0
+            with open(tmp, "wb") as f:
+                for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total > 0 and downloaded % (5 * 1024 * 1024) < len(chunk):
+                        pct = downloaded * 100 // total
+                        log.info("  ... %d%%", pct)
+            tmp.rename(dest)
+
+
+def _download_urllib(url: str, dest: Path) -> None:
+    """Fallback: urllib download (no httpx available)."""
     import urllib.request
 
     log.info("Downloading %s → %s", Path(url).name, dest)
-    dest.parent.mkdir(parents=True, exist_ok=True)
 
     def _report(count, block_size, total_size):
         if total_size > 0 and count % 50 == 0:
@@ -50,22 +87,30 @@ def _download_file(url: str, dest: Path) -> None:
             log.info("  ... %d%%", pct)
 
     urllib.request.urlretrieve(url, str(dest), _report)
-    log.info("Downloaded %s (%.1f MB)", Path(url).name, dest.stat().st_size / 1e6)
 
 
 def _ensure_model(model_dir: str | None = None) -> tuple[Path, Path]:
-    """Return (model_path, voices_path); download if missing.
+    """Return (model_path, voices_path); download missing files in parallel.
 
     Precedence: settings.kokoro.model_dir > ~/.cache/book2audio/kokoro.
     """
+    from concurrent.futures import ThreadPoolExecutor
+
     cache_dir = Path(model_dir).expanduser() if model_dir else _DEFAULT_CACHE_DIR
     model_path = cache_dir / "kokoro-v1.1-zh.onnx"
     voices_path = cache_dir / "voices-v1.1-zh.bin"
 
+    # Collect files that need downloading
+    jobs: list[tuple[str, Path]] = []
     if not model_path.exists():
-        _download_file(_MODEL_URL, model_path)
+        jobs.append((_MODEL_URL, model_path))
     if not voices_path.exists():
-        _download_file(_VOICES_URL, voices_path)
+        jobs.append((_VOICES_URL, voices_path))
+
+    if jobs:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            pool.map(lambda j: _download_file(j[0], j[1]), jobs)
+
     return model_path, voices_path
 
 
