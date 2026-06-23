@@ -227,7 +227,7 @@ class CosyVoiceTTSProvider(BaseTTSProvider):
         try:
             sf.write(str(wav_path), combined.T, sample_rate)
             # Reuse the shared wav→mp3 helper (loudnorm + atempo speed).
-            from core.tts_provider.qwen3_mlx_tts import wav_to_mp3
+            from core.tts_provider.audio_utils import wav_to_mp3
             wav_to_mp3(wav_path, output_path, self.speed)
         finally:
             wav_path.unlink(missing_ok=True)

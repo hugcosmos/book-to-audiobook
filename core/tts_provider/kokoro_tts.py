@@ -178,7 +178,7 @@ class KokoroTTSProvider(BaseTTSProvider):
         try:
             sf.write(str(wav_path), combined, sample_rate)
             # Speed adjustment via FFmpeg atempo
-            from core.tts_provider.qwen3_mlx_tts import wav_to_mp3
+            from core.tts_provider.audio_utils import wav_to_mp3
             wav_to_mp3(wav_path, output_path, self._speed)
         finally:
             wav_path.unlink(missing_ok=True)

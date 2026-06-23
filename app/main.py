@@ -66,7 +66,6 @@ def _preload_tts_model():
                 log.info("CosyVoice model not yet downloaded — will fetch on first synthesis")
         elif provider == "kokoro":
             from core.tts_provider.kokoro_tts import _DEFAULT_CACHE_DIR
-            from pathlib import Path
             model_dir = Path(settings.kokoro.model_dir).expanduser() if settings.kokoro.model_dir else _DEFAULT_CACHE_DIR
             if (model_dir / "kokoro-v1.1-zh.onnx").exists() and (model_dir / "voices-v1.1-zh.bin").exists():
                 from core.tts_provider.kokoro_tts import KokoroTTSProvider

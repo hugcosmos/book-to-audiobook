@@ -26,7 +26,7 @@ def _default_provider_for_platform() -> str:
 class TTSSettings(BaseModel):
     """TTS provider selection and common params."""
 
-    # Apple Silicon → qwen3_mlx; everywhere else (Intel Mac/Win/Linux) → cosyvoice.
+    # Apple Silicon → qwen3_mlx; Intel Mac → kokoro; Win/Linux → cosyvoice.
     # Override via B2A_TTS__PROVIDER or the settings UI.
     provider: str = _default_provider_for_platform()
     default_voice: str = "vivian"

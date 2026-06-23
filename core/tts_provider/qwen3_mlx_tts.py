@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import queue
-import subprocess
 import threading
 from pathlib import Path
 
@@ -12,6 +11,7 @@ import soundfile as sf
 from config.settings import settings
 from core.models import TTSConfig
 from core.text_processor import TextProcessor
+from core.tts_provider.audio_utils import wav_to_mp3
 from core.tts_provider.base_tts import BaseTTSProvider
 from utils.log import log
 
@@ -338,36 +338,6 @@ def _trim_trailing_silence(audio: np.ndarray, sample_rate: int, threshold: float
     keep_after = int(sample_rate * 0.3)
     end = min(above[-1] + keep_after, len(audio))
     return audio[:end]
-
-
-def wav_to_mp3(wav_path: Path, mp3_path: Path, speed: float = 1.0) -> None:
-    filters = []
-    # Loudness normalization: targets -16 LUFS, smooths volume fluctuations
-    filters.append("loudnorm=I=-16:TP=-1.5:LRA=11")
-    if speed != 1.0:
-        # atempo range is [0.5, 2.0]; chain for values outside range
-        remaining = speed
-        while remaining > 2.0:
-            filters.append("atempo=2.0")
-            remaining /= 2.0
-        while remaining < 0.5:
-            filters.append("atempo=0.5")
-            remaining /= 0.5
-        filters.append(f"atempo={remaining:.4f}")
-
-    cmd = [
-        settings.ffmpeg_path,
-        "-y",
-        "-i", str(wav_path),
-        "-filter:a", ",".join(filters),
-        "-codec:a", "libmp3lame",
-        "-q:a", "2",
-        str(mp3_path),
-    ]
-    result = subprocess.run(cmd, capture_output=True)
-    if result.returncode != 0:
-        log.error("ffmpeg wav→mp3 failed: %s\nstderr: %s", " ".join(cmd), result.stderr.decode(errors="replace"))
-        result.check_returncode()
 
 
 def float_audio_to_wav(audio: np.ndarray, output_path: Path, sample_rate: int) -> None:
