@@ -37,3 +37,4 @@ config/user_settings.json
 
 # Test artifacts
 *.wav
+.playwright-mcp/

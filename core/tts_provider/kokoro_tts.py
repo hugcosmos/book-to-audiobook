@@ -109,7 +109,9 @@ def _ensure_model(model_dir: str | None = None) -> tuple[Path, Path]:
 
     if jobs:
         with ThreadPoolExecutor(max_workers=2) as pool:
-            pool.map(lambda j: _download_file(j[0], j[1]), jobs)
+            futures = [pool.submit(_download_file, url, path) for url, path in jobs]
+            for f in futures:
+                f.result()  # raise on first error
 
     return model_path, voices_path
 
