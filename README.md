@@ -86,7 +86,7 @@ Run `book2audio doc` for detailed help, or `book2audio <command> --help`.
 
 ```bash
 book2audio convert book.epub
-book2audio convert book.epub -c 1-10 -p edge-tts -v zh-CN-XiaoyiNeural -s 1.2
+book2audio convert book.epub -c 1-10 -p edge -v zh-CN-XiaoyiNeural -s 1.2
 book2audio convert --book-id a74e947e332e -c 11-20
 book2audio convert book.pdf -p qwen3_mlx -l en-US
 ```

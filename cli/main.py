@@ -148,13 +148,13 @@ instead of the original text during conversion.
 Examples:
   book2audio convert book.epub
   book2audio convert book.epub -c 1-10
-  book2audio convert book.pdf -p edge-tts -v zh-CN-XiaoyiNeural
+  book2audio convert book.pdf -p edge -v zh-CN-XiaoyiNeural
   book2audio convert --book-id a74e947e332e
   book2audio convert book.epub -p qwen3_mlx
   book2audio convert book.epub -p kokoro -v zf_003""")
 @click.argument("input_file", required=False, type=click.Path(exists=True))
 @click.option("--chapters", "-c", default=None, help="Chapter range (e.g., '1-5,7,10-')")
-@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx, supertonic, cosyvoice, kokoro")
+@click.option("--provider", "-p", default=None, help="TTS provider: edge, elevenlabs, baidu, iflytek, qwen3_mlx, supertonic, cosyvoice, kokoro")
 @click.option("--voice", "-v", default=None, help="Voice name (see 'book2audio doc')")
 @click.option("--language", "-l", default="zh-CN", help="Language code (zh-CN, en-US, ja-JP, etc.)")
 @click.option("--speed", "-s", type=float, default=None, help="Speech speed (0.5-2.0, default: 1.0)")
@@ -425,7 +425,7 @@ Commands: show, get, set, reset
 Examples:
   book2audio config show
   book2audio config get tts.provider
-  book2audio config set tts.provider edge-tts""")
+  book2audio config set tts.provider edge""")
 @click.argument("command")
 @click.argument("key", required=False)
 @click.argument("value", required=False)
@@ -655,7 +655,7 @@ def doc():
         "      --book-id ID       Use existing library book\n\n"
         "[bold]Examples:[/bold]\n"
         "  [dim]book2audio convert book.epub[/dim]\n"
-        "  [dim]book2audio convert book.epub -c 1-10 -p edge-tts[/dim]\n"
+        "  [dim]book2audio convert book.epub -c 1-10 -p edge[/dim]\n"
         "  [dim]book2audio convert --book-id abc123 -c 3,5,7[/dim]\n"
         "  [dim]book2audio convert book.pdf -p qwen3_mlx -l en-US[/dim]\n"
         "  [dim]book2audio convert book.epub -p kokoro -v zf_003[/dim]",
@@ -727,7 +727,7 @@ def doc():
         "[bold]Examples:[/bold]\n"
         "  [dim]book2audio config show[/dim]\n"
         "  [dim]book2audio config get tts.provider[/dim]\n"
-        "  [dim]book2audio config set tts.provider edge-tts[/dim]\n"
+        "  [dim]book2audio config set tts.provider edge[/dim]\n"
         "  [dim]book2audio config set qwen3_mlx.speed 1.2[/dim]",
         title="config",
         border_style="green",
@@ -745,13 +745,13 @@ def doc():
 
     console.print(Panel(
         "[bold]TTS Providers:[/bold]\n\n"
-        "  [bold]edge-tts[/bold]       Free, good quality. Microsoft Edge voices.\n"
+        "  [bold]edge[/bold]           Free, good quality. Microsoft Edge voices.\n"
         "  [bold]qwen3_mlx[/bold]      Local, Apple Silicon optimized. Needs mlx-audio.\n"
         "  [bold]kokoro[/bold]         Local, ONNX/CPU (kokoro-onnx). 100+ CN voices. Intel Mac default.\n"
         "  [bold]supertonic[/bold]     Local, ONNX-based, 33 languages. Needs supertonic.\n"
         "  [bold]cosyvoice[/bold]     Local, ONNX/CPU (sherpa-onnx). Optional. Needs sherpa-onnx.\n"
-        "  [bold]baidu-tts[/bold]      Baidu API. Requires app_id + api_key.\n"
-        "  [bold]iflytek-tts[/bold]    iFlytek API. Requires app_id + api_key + api_secret.\n"
+        "  [bold]baidu[/bold]          Baidu API. Requires app_id + api_key.\n"
+        "  [bold]iflytek[/bold]        iFlytek API. Requires app_id + api_key + api_secret.\n"
         "  [bold]elevenlabs[/bold]     ElevenLabs API. Requires api_key.\n\n"
         "[bold]Languages:[/bold] zh-CN, en-US, ja-JP, ko-KR,\n"
         "               fr-FR, de-DE, ru-RU, es-ES, pt-PT, it-IT + 23 more (supertonic)",
