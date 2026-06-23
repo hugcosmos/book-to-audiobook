@@ -193,7 +193,7 @@ Environment variables with `B2A_` prefix, or `book2audio config set`:
 
 ```bash
 book2audio config show
-book2audio config set tts.provider edge-tts
+book2audio config set tts.provider edge
 book2audio config set qwen3_mlx.speed 1.2
 ```
 

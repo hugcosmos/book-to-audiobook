@@ -17,7 +17,7 @@ router = APIRouter()
 class ConvertBody(BaseModel):
     selected_chapters: list[int]
     provider: str | None = None
-    voice: str = "vivian"
+    voice: str = ""  # resolved to settings.tts.default_voice below
     language: str = "zh-CN"
     speed: float | None = None
     output_m4b: bool = True
@@ -31,6 +31,10 @@ async def start_convert(book_id: str, body: ConvertBody, force: int = Query(0)):
     book = converter.get_book(book_id)
     if not book:
         raise HTTPException(404, "Book not found")
+
+    # Resolve default voice to match platform/provider default if not specified
+    if not body.voice:
+        body.voice = settings.tts.default_voice
 
     # Language validation
     if not force:
