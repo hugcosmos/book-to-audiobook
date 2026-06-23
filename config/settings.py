@@ -23,13 +23,23 @@ def _default_provider_for_platform() -> str:
     return "cosyvoice"
 
 
+def _default_voice_for_platform() -> str:
+    """Pick a sensible default voice matching the default provider."""
+    provider = _default_provider_for_platform()
+    if provider == "kokoro":
+        return "zf_048"
+    if provider == "qwen3_mlx":
+        return "vivian"
+    return "0"  # cosyvoice preset
+
+
 class TTSSettings(BaseModel):
     """TTS provider selection and common params."""
 
     # Apple Silicon → qwen3_mlx; Intel Mac → kokoro; Win/Linux → cosyvoice.
     # Override via B2A_TTS__PROVIDER or the settings UI.
     provider: str = _default_provider_for_platform()
-    default_voice: str = "vivian"
+    default_voice: str = _default_voice_for_platform()
     default_language: str = "zh-CN"
     max_retries: int = 5
     chars_per_second: float = 4.0
