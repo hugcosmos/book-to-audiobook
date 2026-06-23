@@ -43,17 +43,19 @@ pip install -e .
 ```
 
 The default install pulls in a working local TTS engine for your platform:
-**Qwen3 MLX on Apple Silicon** (arm64 macOS), **CosyVoice on every other platform**
-(Intel Mac / Windows / Linux, runs on CPU via sherpa-onnx). No extra step needed
-for the default provider — it matches the platform-aware default selected at
-runtime. Cloud providers (Edge/Baidu/iFlytek/ElevenLabs) only need their API keys.
+**Qwen3 MLX on Apple Silicon**, **Kokoro on Intel Mac** (82M ONNX/CPU model,
+100+ Chinese voices), **CosyVoice on Windows / Linux**. No extra step needed for
+the default provider — it's selected automatically at runtime. Cloud providers
+(Edge/Baidu/iFlytek/ElevenLabs) only need their API keys.
 
 ### Optional local providers
 
 - **Supertonic** (ONNX, 33 languages): `pip install "book-to-audiobook[supertonic]"`
   (not default — pulls in onnxruntime, which lacks wheels on some Python versions)
-- **CosyVoice on Apple Silicon** (if you want it alongside Qwen3 MLX):
+- **CosyVoice on macOS** (not default on Mac):
   `pip install "book-to-audiobook[cosyvoice]"`
+- **Kokoro on non-Intel-Mac** (not default on Apple Silicon / Win / Linux):
+  `pip install "book-to-audiobook[kokoro]"`
 
 ## Quick Start
 
@@ -137,6 +139,17 @@ export HF_HUB_ENABLE_HF_TRANSFER=1
 
 Set via Settings page or `book2audio config set qwen3_mlx.model_name <model>`.
 
+### Local — Kokoro (ONNX / CPU, via kokoro-onnx)
+
+Default on Intel Mac. Kokoro-82M is a compact 82M-parameter TTS model running on CPU via ONNX Runtime. The v1.1-zh model supports 100 Chinese voices + English.
+
+```bash
+pip install "book-to-audiobook[kokoro]"
+# or directly: pip install kokoro-onnx onnxruntime misaki pypinyin
+```
+
+Model files (~380MB) are downloaded automatically on first use to `~/.cache/book2audio/kokoro` (override with `B2A_KOKORO__MODEL_DIR`). 12 voices are curated by default (6 female, 6 male); all 100 Chinese voices are available via the Voice Manager.
+
 ### Local — Supertonic (ONNX)
 
 On-device, 33 languages, no API key. Works on any platform (CPU/GPU).
@@ -150,7 +163,7 @@ pip install "book-to-audiobook[supertonic]"
 
 ### Local — CosyVoice (ONNX / CPU, via sherpa-onnx)
 
-On-device, multilingual (zh / en / ja / ko), no API key. Runs entirely on CPU through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) — **the recommended local provider for low-spec or GPU-less machines** (e.g. Intel MacBook Air), where the native PyTorch CosyVoice would be unusably slow.
+Default on Windows / Linux. On-device, multilingual (zh / en / ja / ko), no API key. Runs entirely on CPU through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) — recommended for GPU-less Windows/Linux machines.
 
 ```bash
 pip install "book-to-audiobook[cosyvoice]"
@@ -165,19 +178,19 @@ The quantized ONNX model (~0.6–1.2 GB) is downloaded automatically on first us
 
 Availability depends on provider:
 
-| Language | Edge | Qwen3 MLX | ElevenLabs | Supertonic | CosyVoice | Baidu | iFlytek |
-|----------|------|-----------|------------|------------|-----------|-------|---------|
-| Chinese (zh-CN) | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ |
-| English (en-US) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
-| Japanese | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
-| Korean | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
-| French | ✓ | ✓ | ✓ | ✓ | — | — | — |
-| German | ✓ | ✓ | ✓ | ✓ | — | — | — |
-| Spanish | ✓ | ✓ | ✓ | ✓ | — | — | — |
-| Russian | ✓ | ✓ | ✓ | ✓ | — | — | — |
-| Portuguese | — | ✓ | ✓ | ✓ | — | — | — |
-| Italian | — | ✓ | ✓ | ✓ | — | — | — |
-| + 23 more | — | — | — | ✓ | — | — | — |
+| Language | Edge | Qwen3 MLX | ElevenLabs | Supertonic | CosyVoice | Kokoro | Baidu | iFlytek |
+|----------|------|-----------|------------|------------|-----------|--------|-------|---------|
+| Chinese (zh-CN) | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ |
+| English (en-US) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| Japanese | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| Korean | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| French | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| German | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Spanish | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Russian | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
+| Portuguese | — | ✓ | ✓ | ✓ | — | — | — | — |
+| Italian | — | ✓ | ✓ | ✓ | — | — | — | — |
+| + 23 more | — | — | — | ✓ | — | — | — | — |
 
 ## Configuration
 
@@ -211,7 +224,7 @@ output/            # Generated audiobook files
 
 **Edge TTS**: This project includes [edge-tts](https://github.com/rany2/edge-tts) as one TTS provider, which connects to Microsoft Edge's online text-to-speech service. This is not an official Microsoft API and may violate Microsoft's Terms of Service.
 
-Users can choose alternative providers (ElevenLabs, Baidu, iFlytek, or local Qwen3 MLX / Supertonic) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
+Users can choose alternative providers (Kokoro, Qwen3 MLX, CosyVoice, Supertonic, ElevenLabs, Baidu, iFlytek) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
 
 ## License
 
