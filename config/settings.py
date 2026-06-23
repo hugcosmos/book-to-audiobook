@@ -8,18 +8,19 @@ from pydantic_settings import BaseSettings
 
 
 def _default_provider_for_platform() -> str:
-    """Pick the default local TTS provider based on the host platform.
+    """Pick the default TTS provider based on the host platform.
 
-    Apple Silicon (arm64 macOS) can run Qwen3 MLX (GPU-accelerated, highest
-    quality), so that stays the default there. On every other platform — Intel
-    Macs, Windows, Linux without a GPU — Qwen3 MLX is unavailable (its wheel is
-    arm64-only), so fall back to CosyVoice (ONNX/CPU), which runs anywhere.
-    Users can still override via B2A_TTS__PROVIDER or the settings UI.
+    Apple Silicon → Qwen3 MLX (GPU-accelerated).
+    Intel Mac → Kokoro (kokoro-onnx, ONNX/CPU, 100 Chinese voices).
+    Windows / Linux → CosyVoice (sherpa-onnx, ONNX/CPU).
+
+    Users can override via B2A_TTS__PROVIDER or the settings UI.
     """
-    is_apple_silicon = (
-        platform.system() == "Darwin" and platform.machine() == "arm64"
-    )
-    return "qwen3_mlx" if is_apple_silicon else "cosyvoice"
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        return "qwen3_mlx"
+    if platform.system() == "Darwin":
+        return "kokoro"
+    return "cosyvoice"
 
 
 class TTSSettings(BaseModel):
@@ -110,6 +111,18 @@ class CosyVoiceSettings(BaseModel):
     huggingface_repo: str = "k2-fsa/sherpa-onnx-cosyvoice2-0.5B-int8"
 
 
+class KokoroSettings(BaseModel):
+    """Kokoro TTS via kokoro-onnx — local ONNX/CPU runtime, 82M model.
+
+    Uses the v1.1-zh multilingual model: 100 Chinese + 3 English speakers.
+    Needs Python >= 3.12 on macOS x86 (onnxruntime wheel availability).
+    """
+
+    model_dir: str | None = None        # None → auto-download to ~/.cache/book2audio/kokoro
+    chunk_max_chars: int = 300          # per-chunk char cap (Kokoro has ~510 token context)
+    speed: float = 1.0                  # speech speed multiplier
+
+
 class AudioSettings(BaseModel):
     """Audio assembly options."""
 
@@ -137,6 +150,7 @@ class Settings(BaseSettings):
     qwen3_mlx: Qwen3MLXSettings = Qwen3MLXSettings()
     supertonic: SupertonicSettings = SupertonicSettings()
     cosyvoice: CosyVoiceSettings = CosyVoiceSettings()
+    kokoro: KokoroSettings = KokoroSettings()
     audio: AudioSettings = AudioSettings()
 
     model_config = {"env_prefix": "B2A_"}

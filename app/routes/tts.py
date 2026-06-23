@@ -59,6 +59,7 @@ _PROVIDER_LABELS = {
     "elevenlabs": "ElevenLabs",
     "supertonic": "Supertonic (Local · 31 langs)",
     "cosyvoice": "CosyVoice (本地 · ONNX/CPU)",
+    "kokoro": "Kokoro TTS (本地 · ONNX · 中文)",
 }
 
 
@@ -83,6 +84,12 @@ def _is_configured(provider: str) -> bool:
     if provider == "cosyvoice":
         try:
             import sherpa_onnx  # noqa: F401
+            return True
+        except ImportError:
+            return False
+    if provider == "kokoro":
+        try:
+            from kokoro_onnx import Kokoro  # noqa: F401
             return True
         except ImportError:
             return False

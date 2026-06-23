@@ -207,6 +207,8 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
             speed = settings.supertonic.speed
         elif effective_provider == "cosyvoice":
             speed = settings.cosyvoice.speed
+        elif effective_provider == "kokoro":
+            speed = settings.kokoro.speed
         else:
             speed = 1.0
     console.print(f"[bold blue]Speed:[/bold blue] {speed}x")

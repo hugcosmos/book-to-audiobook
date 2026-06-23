@@ -33,6 +33,7 @@ _PROVIDER_FIELDS = {
     "qwen3_mlx": ["model_name", "chunk_max_seconds", "speed"],
     "supertonic": ["total_steps", "speed", "chunk_max_chars"],
     "cosyvoice": ["model_dir", "download_source", "num_threads", "chunk_max_chars", "speed"],
+    "kokoro": ["model_dir", "chunk_max_chars", "speed"],
 }
 
 _PROVIDER_LABELS = {
@@ -43,6 +44,7 @@ _PROVIDER_LABELS = {
     "qwen3_mlx": "Qwen3 MLX",
     "supertonic": "Supertonic (Local · 31 langs)",
     "cosyvoice": "CosyVoice (Local · ONNX/CPU)",
+    "kokoro": "Kokoro TTS (Local · ONNX · 中文)",
 }
 
 # Maps settings section name to VOICE_REGISTRY provider key
@@ -54,6 +56,7 @@ _SECTION_TO_VOICE_PROVIDER = {
     "qwen3_mlx": "qwen3_mlx",
     "supertonic": "supertonic",
     "cosyvoice": "cosyvoice",
+    "kokoro": "kokoro",
 }
 
 
@@ -113,11 +116,12 @@ async def list_settings_voices(provider: str):
     custom = get_custom_voices(provider)
     hidden_ids = set(get_hidden_voices(provider))
     # Need all built-in voices including hidden ones, so fetch from original lists
-    from core.tts_provider.voices import VOICE_REGISTRY, _QWEN3_VOICES, _EDGE_VOICES, _BAIDU_VOICES, _IFLYTEK_VOICES, _ELEVENLABS_VOICES, _SUPERTONIC_VOICES, _COSYVOICE_VOICES
+    from core.tts_provider.voices import VOICE_REGISTRY, _QWEN3_VOICES, _EDGE_VOICES, _BAIDU_VOICES, _IFLYTEK_VOICES, _ELEVENLABS_VOICES, _SUPERTONIC_VOICES, _COSYVOICE_VOICES, _KOKORO_VOICES
     _orig = {
         "qwen3_mlx": _QWEN3_VOICES, "edge": _EDGE_VOICES, "baidu": _BAIDU_VOICES,
         "iflytek": _IFLYTEK_VOICES, "elevenlabs": _ELEVENLABS_VOICES,
         "supertonic": _SUPERTONIC_VOICES, "cosyvoice": _COSYVOICE_VOICES,
+        "kokoro": _KOKORO_VOICES,
     }
     all_builtin = _orig.get(provider, [])
     return {

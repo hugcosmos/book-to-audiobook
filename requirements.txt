@@ -16,13 +16,22 @@ edge-tts>=6.1.0
 httpx>=0.27.0
 websockets>=12.0
 # Default local TTS engine by platform (mirrors platform-aware default provider).
-# Apple Silicon → Qwen3 MLX; everywhere else (Intel Mac/Win/Linux) → CosyVoice.
+# Apple Silicon → Qwen3 MLX; Intel Mac → Kokoro; Win/Linux → CosyVoice.
 mlx-audio>=0.1.0; sys_platform == "darwin" and platform_machine == "arm64"
 hf-transfer>=0.1.9; sys_platform == "darwin" and platform_machine == "arm64"
-sherpa-onnx>=1.10.0; sys_platform != "darwin" or platform_machine != "arm64"
-modelscope>=1.18.0; sys_platform != "darwin" or platform_machine != "arm64"
-huggingface-hub>=0.24.0; sys_platform != "darwin" or platform_machine != "arm64"
+kokoro-onnx>=0.5.0; sys_platform == "darwin" and platform_machine != "arm64"
+onnxruntime>=1.19.0; sys_platform == "darwin" and platform_machine != "arm64"
+misaki>=0.9.0; sys_platform == "darwin" and platform_machine != "arm64"
+pypinyin>=0.55.0; sys_platform == "darwin" and platform_machine != "arm64"
+cn2an>=0.5.0; sys_platform == "darwin" and platform_machine != "arm64"
+sherpa-onnx>=1.10.0; sys_platform != "darwin"
+modelscope>=1.18.0; sys_platform != "darwin"
+huggingface-hub>=0.24.0; sys_platform != "darwin"
 # Optional local TTS providers — not installed by default to avoid pulling heavy
 # native deps (onnxruntime) that lack wheels on some Python versions (e.g. 3.13).
 # Install with: pip install "book-to-audiobook[supertonic]"
 #   supertonic>=1.3.0          # ONNX, 33 languages (needs onnxruntime)
+# Install with: pip install "book-to-audiobook[kokoro]"
+#   (on Apple Silicon/Win/Linux; Intel Mac gets kokoro by default)
+#   kokoro-onnx>=0.5.0
+#   onnxruntime>=1.19.0

@@ -122,6 +122,23 @@ _COSYVOICE_VOICES = [
 ]
 
 
+# --- Kokoro TTS (kokoro-onnx, local CPU, v1.1-zh model) ---
+_KOKORO_VOICES = [
+    VoiceInfo("zf_003", "Kokoro 女声 003", VoiceGender.FEMALE, "zh", "kokoro"),
+    VoiceInfo("zf_024", "Kokoro 女声 024", VoiceGender.FEMALE, "zh", "kokoro"),
+    VoiceInfo("zf_038", "Kokoro 女声 038", VoiceGender.FEMALE, "zh", "kokoro"),
+    VoiceInfo("zf_047", "Kokoro 女声 047", VoiceGender.FEMALE, "zh", "kokoro"),
+    VoiceInfo("zf_048", "Kokoro 女声 048", VoiceGender.FEMALE, "zh", "kokoro"),
+    VoiceInfo("zf_059", "Kokoro 女声 059", VoiceGender.FEMALE, "zh", "kokoro"),
+    VoiceInfo("zm_011", "Kokoro 男声 011", VoiceGender.MALE, "zh", "kokoro"),
+    VoiceInfo("zm_012", "Kokoro 男声 012", VoiceGender.MALE, "zh", "kokoro"),
+    VoiceInfo("zm_029", "Kokoro 男声 029", VoiceGender.MALE, "zh", "kokoro"),
+    VoiceInfo("zm_069", "Kokoro 男声 069", VoiceGender.MALE, "zh", "kokoro"),
+    VoiceInfo("zm_089", "Kokoro 男声 089", VoiceGender.MALE, "zh", "kokoro"),
+    VoiceInfo("zm_098", "Kokoro 男声 098", VoiceGender.MALE, "zh", "kokoro"),
+]
+
+
 VOICE_REGISTRY: dict[str, list[VoiceInfo]] = {
     "qwen3_mlx": _QWEN3_VOICES,
     "edge": _EDGE_VOICES,
@@ -130,6 +147,7 @@ VOICE_REGISTRY: dict[str, list[VoiceInfo]] = {
     "elevenlabs": _ELEVENLABS_VOICES,
     "supertonic": _SUPERTONIC_VOICES,
     "cosyvoice": _COSYVOICE_VOICES,
+    "kokoro": _KOKORO_VOICES,
 }
 
 

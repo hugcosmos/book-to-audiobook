@@ -110,6 +110,7 @@ def _rebuild_registry() -> None:
     from core.tts_provider.voices import (
         VOICE_REGISTRY, _QWEN3_VOICES, _EDGE_VOICES, _BAIDU_VOICES,
         _IFLYTEK_VOICES, _ELEVENLABS_VOICES, _SUPERTONIC_VOICES, _COSYVOICE_VOICES,
+        _KOKORO_VOICES,
     )
 
     VOICE_REGISTRY["qwen3_mlx"] = list(_QWEN3_VOICES)
@@ -119,6 +120,7 @@ def _rebuild_registry() -> None:
     VOICE_REGISTRY["elevenlabs"] = list(_ELEVENLABS_VOICES)
     VOICE_REGISTRY["supertonic"] = list(_SUPERTONIC_VOICES)
     VOICE_REGISTRY["cosyvoice"] = list(_COSYVOICE_VOICES)
+    VOICE_REGISTRY["kokoro"] = list(_KOKORO_VOICES)
 
 
 def get_custom_voices(provider: str) -> list[dict]:
