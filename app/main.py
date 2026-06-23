@@ -65,6 +65,12 @@ def _preload_tts_model():
             else:
                 log.info("CosyVoice model not yet downloaded — will fetch on first synthesis")
         elif provider == "kokoro":
+            # Kokoro needs onnxruntime; skip on Python 3.13 (no macOS x86 wheel).
+            try:
+                import onnxruntime  # noqa: F401
+            except ImportError:
+                log.info("Kokoro preload skipped — onnxruntime not available")
+                return
             from core.tts_provider.kokoro_tts import _DEFAULT_CACHE_DIR
             model_dir = Path(settings.kokoro.model_dir).expanduser() if settings.kokoro.model_dir else _DEFAULT_CACHE_DIR
             if (model_dir / "kokoro-v1.1-zh.onnx").exists() and (model_dir / "voices-v1.1-zh.bin").exists():

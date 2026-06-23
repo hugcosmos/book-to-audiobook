@@ -89,6 +89,7 @@ def _is_configured(provider: str) -> bool:
             return False
     if provider == "kokoro":
         try:
+            import onnxruntime  # noqa: F401
             from kokoro_onnx import Kokoro  # noqa: F401
             return True
         except ImportError:

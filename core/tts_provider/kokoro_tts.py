@@ -21,14 +21,29 @@ from core.models import TTSConfig
 from core.tts_provider.base_tts import BaseTTSProvider
 from utils.log import log
 
-_MODEL_URL = (
+# Primary download source (GitHub releases).
+_GH_MODEL_URL = (
     "https://github.com/thewh1teagle/kokoro-onnx/releases/download/"
     "model-files-v1.1/kokoro-v1.1-zh.onnx"
 )
-_VOICES_URL = (
+_GH_VOICES_URL = (
     "https://github.com/thewh1teagle/kokoro-onnx/releases/download/"
     "model-files-v1.1/voices-v1.1-zh.bin"
 )
+
+
+def _model_urls():
+    """Return (model_url, voices_url).
+
+    Honors explicit per-file overrides via env vars first
+    (KOKORO_MODEL_URL / KOKORO_VOICES_URL), so a user behind a slow link can
+    point at any mirror without editing code. Defaults to GitHub releases.
+    """
+    import os
+    return (
+        os.environ.get("KOKORO_MODEL_URL", _GH_MODEL_URL),
+        os.environ.get("KOKORO_VOICES_URL", _GH_VOICES_URL),
+    )
 
 _DEFAULT_CACHE_DIR = Path.home() / ".cache" / "book2audio" / "kokoro"
 
@@ -37,82 +52,147 @@ _kokoro_engine = None
 _engine_lock = asyncio.Lock()
 
 
-def _download_file(url: str, dest: Path) -> None:
-    """Download a file via httpx streaming with progress feedback.
+_DOWNLOAD_MAX_RETRIES = 6
+# Max seconds a single connection may go without delivering any bytes before we
+# abort it and retry. httpx's per-read timeout is unreliable on a stalled TCP
+# connection (no FIN), so we enforce this with a watchdog thread instead.
+_READ_STALL = 60.0
 
-    Uses httpx (already a project dependency) for HTTP/2, connection reuse, and
-    faster downloads than urllib.  Falls back to urllib if httpx is unavailable.
+
+def _mb(n: float) -> str:
+    return f"{n / 1e6:.1f}MB"
+
+
+def _total_from_range(resp) -> int:
+    """True file size from a 206/416 response.
+
+    ``Content-Range: bytes <start>-<end>/<total>`` (206) or
+    ``bytes */<total>`` (416) gives the real total; we fall back to
+    Content-Length (+resume offset) when the header is absent.
     """
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        import httpx
-        _download_httpx(url, dest)
-    except ImportError:
-        _download_urllib(url, dest)
-    log.info("Downloaded %s (%.1f MB)", Path(url).name, dest.stat().st_size / 1e6)
+    cr = resp.headers.get("content-range", "")
+    # matches ".../<total>"
+    if "/" in cr and not cr.endswith("/*"):
+        try:
+            return int(cr.rsplit("/", 1)[1])
+        except ValueError:
+            pass
+    cl = int(resp.headers.get("content-length", 0))
+    if resp.status_code == 206 and cl:
+        # Content-Length on 206 is the *remaining* bytes; add resume offset.
+        try:
+            start = int(cr.split("-", 1)[0].rsplit(" ", 1)[-1])
+            return cl + start
+        except (ValueError, IndexError):
+            pass
+    return cl
 
 
-def _download_httpx(url: str, dest: Path) -> None:
-    """Stream a file with httpx for better throughput."""
+def _download_file(url: str, dest: Path) -> None:
+    """Download *url* to *dest* with resume + retries + size check.
+
+    GitHub release assets are ~330 MB and the connection from many regions is
+    slow/unstable, so a single streaming GET almost never finishes. Three
+    things make this robust:
+
+      * **Resume**: the final blob (Azure CDN after the 302) advertises
+        ``Accept-Ranges: bytes``, so we append to ``dest.part`` on each retry
+        via ``Range: bytes=N-`` instead of restarting from zero.
+      * **Retries with backoff**: each attempt is bounded by a read timeout,
+        retried up to ``_DOWNLOAD_MAX_RETRIES`` times.
+      * **Completeness check**: the part is renamed to *dest* only once it
+        reaches the true size; a truncated part stays for the next run.
+    """
     import httpx
 
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    part = dest.with_suffix(dest.suffix + ".part")
     name = Path(url).name
-    with httpx.Client(http2=True, follow_redirects=True, timeout=600) as client:
-        with client.stream("GET", url) as resp:
-            resp.raise_for_status()
-            total = int(resp.headers.get("content-length", 0))
-            log.info("Downloading %s (%.1f MB)", name, total / 1e6)
+    log.info("Downloading %s → %s", name, dest)
 
-            tmp = dest.with_suffix(dest.suffix + ".part")
-            downloaded = 0
-            with open(tmp, "wb") as f:
-                for chunk in resp.iter_bytes(chunk_size=1024 * 1024):
-                    f.write(chunk)
-                    downloaded += len(chunk)
-                    if total > 0 and downloaded % (5 * 1024 * 1024) < len(chunk):
-                        pct = downloaded * 100 // total
-                        log.info("  ... %d%%", pct)
-            tmp.rename(dest)
+    total = 0
+    for attempt in range(1, _DOWNLOAD_MAX_RETRIES + 1):
+        have = part.stat().st_size if part.exists() else 0
+        headers = {"Range": f"bytes={have}-"} if have else None
 
+        try:
+            # We rely on the OS-level socket timeout (read= below) to bound a
+            # stalled connection. httpx translates its read timeout into a
+            # socket recv timeout, which fires even when the peer stops sending
+            # without a FIN — unlike an in-Python sleep, a blocked recv() is
+            # interruptible by the kernel timer. The actual download loop runs
+            # inline so there is no abandoned worker to corrupt the part file.
+            client = httpx.Client(
+                follow_redirects=True,
+                timeout=httpx.Timeout(connect=30, read=_READ_STALL,
+                                      write=30, pool=30),
+            )
+            with client.stream("GET", url, headers=headers) as resp:
+                if resp.status_code == 416:
+                    # Part already covers the whole file (or overshoots).
+                    total = _total_from_range(resp) or total
+                else:
+                    resp.raise_for_status()
+                    total = _total_from_range(resp) or total
+                    if total and have >= total:
+                        break  # already complete
+                    log.info("  attempt %d: resuming at %s / %s",
+                             attempt, _mb(have), _mb(total) if total else "?")
+                    resume = resp.status_code == 206
+                    with open(part, "ab" if resume else "wb") as f:
+                        last_log = time.time()
+                        last_have = have if resume else 0
+                        for chunk in resp.iter_bytes(chunk_size=512 * 1024):
+                            f.write(chunk)
+                            have += len(chunk)
+                            now = time.time()
+                            if total and now - last_log >= 5:
+                                dt = max(1e-9, now - last_log)
+                                log.info("  ... %d%% (%.1f MB/s)",
+                                         have * 100 // total,
+                                         (have - last_have) / 1e6 / dt)
+                                last_log, last_have = now, have
+            client.close()
+        except (httpx.HTTPError, OSError) as exc:
+            have = part.stat().st_size if part.exists() else 0
+            log.warning("  attempt %d stalled/failed at %s: %s",
+                        attempt, _mb(have), type(exc).__name__)
+            if attempt < _DOWNLOAD_MAX_RETRIES:
+                time.sleep(min(2 ** attempt, 30))
+            continue
 
-def _download_urllib(url: str, dest: Path) -> None:
-    """Fallback: urllib download (no httpx available)."""
-    import urllib.request
+        have = part.stat().st_size if part.exists() else 0
+        if total and have >= total:
+            break
+        log.info("  incomplete: %s / %s — will resume",
+                 _mb(have), _mb(total) if total else "?")
+    else:
+        have = part.stat().st_size if part.exists() else 0
+        raise RuntimeError(
+            f"Failed to download {name} after {_DOWNLOAD_MAX_RETRIES} attempts "
+            f"({_mb(have)} of {_mb(total) if total else '?'}). The GitHub "
+            f"release mirror may be slow/blocked from your network — set "
+            f"KOKORO_MODEL_URL / KOKORO_VOICES_URL to a faster mirror."
+        )
 
-    log.info("Downloading %s → %s", Path(url).name, dest)
-
-    def _report(count, block_size, total_size):
-        if total_size > 0 and count % 50 == 0:
-            pct = min(100, count * block_size * 100 // total_size)
-            log.info("  ... %d%%", pct)
-
-    urllib.request.urlretrieve(url, str(dest), _report)
+    part.rename(dest)
+    log.info("Downloaded %s (%s)", name, _mb(dest.stat().st_size))
 
 
 def _ensure_model(model_dir: str | None = None) -> tuple[Path, Path]:
-    """Return (model_path, voices_path); download missing files in parallel.
+    """Return (model_path, voices_path); download if missing.
 
     Precedence: settings.kokoro.model_dir > ~/.cache/book2audio/kokoro.
     """
-    from concurrent.futures import ThreadPoolExecutor
-
     cache_dir = Path(model_dir).expanduser() if model_dir else _DEFAULT_CACHE_DIR
     model_path = cache_dir / "kokoro-v1.1-zh.onnx"
     voices_path = cache_dir / "voices-v1.1-zh.bin"
 
-    # Collect files that need downloading
-    jobs: list[tuple[str, Path]] = []
+    model_url, voices_url = _model_urls()
     if not model_path.exists():
-        jobs.append((_MODEL_URL, model_path))
+        _download_file(model_url, model_path)
     if not voices_path.exists():
-        jobs.append((_VOICES_URL, voices_path))
-
-    if jobs:
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            futures = [pool.submit(_download_file, url, path) for url, path in jobs]
-            for f in futures:
-                f.result()  # raise on first error
-
+        _download_file(voices_url, voices_path)
     return model_path, voices_path
 
 
@@ -141,7 +221,12 @@ def _get_engine(model_dir_override: str | None = None):
         from kokoro_onnx import Kokoro
     except ImportError:
         _install_kokoro_onnx()
-        from kokoro_onnx import Kokoro
+        try:
+            from kokoro_onnx import Kokoro
+        except ImportError as e:
+            raise RuntimeError(
+                "Kokoro TTS needs 'onnxruntime'. Install with: pip install onnxruntime"
+            ) from e
 
     model_path, voices_path = _ensure_model(model_dir_override)
     start = time.time()
@@ -176,10 +261,16 @@ class KokoroTTSProvider(BaseTTSProvider):
     @classmethod
     def validate_config(cls, config: TTSConfig) -> None:
         try:
+            import onnxruntime  # noqa: F401
             from kokoro_onnx import Kokoro  # noqa: F401
         except ImportError:
             _install_kokoro_onnx()
-            from kokoro_onnx import Kokoro  # noqa: F401
+            try:
+                from kokoro_onnx import Kokoro  # noqa: F401
+            except ImportError as e:
+                raise ValueError(
+                    "Kokoro TTS needs 'onnxruntime'. Install with: pip install onnxruntime"
+                ) from e
 
     @classmethod
     def warmup(cls) -> None:
