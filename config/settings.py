@@ -95,8 +95,8 @@ class SupertonicSettings(BaseModel):
 class CosyVoiceSettings(BaseModel):
     """CosyVoice TTS via sherpa-onnx — local ONNX/CPU runtime.
 
-    Aimed at low-spec / GPU-less machines (e.g. Intel MacBook Air). CosyVoice2
-    is exported to a quantized ONNX model and run on CPU through sherpa-onnx.
+    CosyVoice2 is exported to a quantized ONNX model and run on CPU through
+    sherpa-onnx. Optional on macOS; install via [cosyvoice] extras.
     """
 
     model_dir: str | None = None       # None → auto-download to ~/.cache/book2audio/cosyvoice2
