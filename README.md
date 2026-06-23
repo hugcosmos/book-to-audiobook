@@ -26,9 +26,8 @@ conda create -n book2audio python=3.12 -y
 conda activate book2audio
 ```
 
-> **Intel Mac users:** Kokoro (the default provider) needs Python ≤ 3.12 because
-> onnxruntime has no macOS x86 wheel for Python 3.13. Python 3.12 is recommended
-> across all platforms.
+> Kokoro (the default provider on Intel Mac) needs Python ≤ 3.12 because
+> onnxruntime has no macOS x86 wheel for Python 3.13.
 
 Then choose one:
 
@@ -46,20 +45,16 @@ cd book-to-audiobook
 pip install -e .
 ```
 
-The default install pulls in a working local TTS engine for your platform:
+The default install pulls in a working local TTS engine:
 **Qwen3 MLX on Apple Silicon**, **Kokoro on Intel Mac** (82M ONNX/CPU model,
-100+ Chinese voices), **CosyVoice on Windows / Linux**. No extra step needed for
-the default provider — it's selected automatically at runtime. Cloud providers
-(Edge/Baidu/iFlytek/ElevenLabs) only need their API keys.
+100+ Chinese voices). No extra step needed — the provider is selected
+automatically. Cloud providers (Edge/Baidu/iFlytek/ElevenLabs) only need API keys.
 
 ### Optional local providers
 
 - **Supertonic** (ONNX, 33 languages): `pip install "book-to-audiobook[supertonic]"`
-  (not default — pulls in onnxruntime, which lacks wheels on some Python versions)
-- **CosyVoice on macOS** (not default on Mac):
-  `pip install "book-to-audiobook[cosyvoice]"`
-- **Kokoro on non-Intel-Mac** (not default on Apple Silicon / Win / Linux):
-  `pip install "book-to-audiobook[kokoro]"`
+- **CosyVoice** (sherpa-onnx, ONNX/CPU, multilingual): `pip install "book-to-audiobook[cosyvoice]"`
+- **Kokoro on Apple Silicon**: `pip install "book-to-audiobook[kokoro]"`
 
 ## Quick Start
 
@@ -146,11 +141,7 @@ Set via Settings page or `book2audio config set qwen3_mlx.model_name <model>`.
 ### Local — Kokoro (ONNX / CPU, via kokoro-onnx)
 
 Default on Intel Mac. Kokoro-82M is a compact 82M-parameter TTS model running on CPU via ONNX Runtime. The v1.1-zh model supports 100 Chinese voices + English.
-
-```bash
-pip install "book-to-audiobook[kokoro]"
-# or directly: pip install kokoro-onnx onnxruntime misaki pypinyin
-```
+On Apple Silicon, install via `pip install "book-to-audiobook[kokoro]"`.
 
 Model files (~380MB) are downloaded automatically on first use to `~/.cache/book2audio/kokoro` (override with `B2A_KOKORO__MODEL_DIR`). 12 voices are curated by default (6 female, 6 male); all 100 Chinese voices are available via the Voice Manager.
 
@@ -167,7 +158,7 @@ pip install "book-to-audiobook[supertonic]"
 
 ### Local — CosyVoice (ONNX / CPU, via sherpa-onnx)
 
-Default on Windows / Linux. On-device, multilingual (zh / en / ja / ko), no API key. Runs entirely on CPU through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) — recommended for GPU-less Windows/Linux machines.
+Optional local provider. On-device, multilingual (zh / en / ja / ko), no API key. Runs on CPU through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx).
 
 ```bash
 pip install "book-to-audiobook[cosyvoice]"

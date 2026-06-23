@@ -747,7 +747,7 @@ def doc():
         "  [bold]qwen3_mlx[/bold]      Local, Apple Silicon optimized. Needs mlx-audio.\n"
         "  [bold]kokoro[/bold]         Local, ONNX/CPU (kokoro-onnx). 100+ CN voices. Intel Mac default.\n"
         "  [bold]supertonic[/bold]     Local, ONNX-based, 33 languages. Needs supertonic.\n"
-        "  [bold]cosyvoice[/bold]     Local, ONNX/CPU (sherpa-onnx). Win/Linux default. Needs sherpa-onnx.\n"
+        "  [bold]cosyvoice[/bold]     Local, ONNX/CPU (sherpa-onnx). Optional. Needs sherpa-onnx.\n"
         "  [bold]baidu-tts[/bold]      Baidu API. Requires app_id + api_key.\n"
         "  [bold]iflytek-tts[/bold]    iFlytek API. Requires app_id + api_key + api_secret.\n"
         "  [bold]elevenlabs[/bold]     ElevenLabs API. Requires api_key.\n\n"

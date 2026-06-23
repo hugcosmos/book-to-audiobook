@@ -8,35 +8,25 @@ from pydantic_settings import BaseSettings
 
 
 def _default_provider_for_platform() -> str:
-    """Pick the default TTS provider based on the host platform.
+    """Pick the default TTS provider.
 
     Apple Silicon → Qwen3 MLX (GPU-accelerated).
     Intel Mac → Kokoro (kokoro-onnx, ONNX/CPU, 100 Chinese voices).
-    Windows / Linux → CosyVoice (sherpa-onnx, ONNX/CPU).
 
-    Users can override via B2A_TTS__PROVIDER or the settings UI.
+    Override via B2A_TTS__PROVIDER or the settings UI.
     """
-    if platform.system() == "Darwin" and platform.machine() == "arm64":
-        return "qwen3_mlx"
-    if platform.system() == "Darwin":
-        return "kokoro"
-    return "cosyvoice"
+    return "qwen3_mlx" if platform.machine() == "arm64" else "kokoro"
 
 
 def _default_voice_for_platform() -> str:
     """Pick a sensible default voice matching the default provider."""
-    provider = _default_provider_for_platform()
-    if provider == "kokoro":
-        return "zf_048"
-    if provider == "qwen3_mlx":
-        return "vivian"
-    return "0"  # cosyvoice preset
+    return "vivian" if platform.machine() == "arm64" else "zf_048"
 
 
 class TTSSettings(BaseModel):
     """TTS provider selection and common params."""
 
-    # Apple Silicon → qwen3_mlx; Intel Mac → kokoro; Win/Linux → cosyvoice.
+    # Apple Silicon → qwen3_mlx; Intel Mac → kokoro.
     # Override via B2A_TTS__PROVIDER or the settings UI.
     provider: str = _default_provider_for_platform()
     default_voice: str = _default_voice_for_platform()
