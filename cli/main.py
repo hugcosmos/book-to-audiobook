@@ -150,10 +150,11 @@ Examples:
   book2audio convert book.epub -c 1-10
   book2audio convert book.pdf -p edge-tts -v zh-CN-XiaoyiNeural
   book2audio convert --book-id a74e947e332e
-  book2audio convert book.epub -p qwen3_mlx""")
+  book2audio convert book.epub -p qwen3_mlx
+  book2audio convert book.epub -p kokoro -v zf_003""")
 @click.argument("input_file", required=False, type=click.Path(exists=True))
 @click.option("--chapters", "-c", default=None, help="Chapter range (e.g., '1-5,7,10-')")
-@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx, supertonic, cosyvoice")
+@click.option("--provider", "-p", default=None, help="TTS provider: edge-tts, elevenlabs, baidu-tts, iflytek-tts, qwen3_mlx, supertonic, cosyvoice, kokoro")
 @click.option("--voice", "-v", default="vivian", help="Voice name (see 'book2audio doc')")
 @click.option("--language", "-l", default="zh-CN", help="Language code (zh-CN, en-US, ja-JP, etc.)")
 @click.option("--speed", "-s", type=float, default=None, help="Speech speed (0.5-2.0, default: 1.0)")
@@ -655,7 +656,7 @@ def doc():
         "  [dim]book2audio convert book.epub -c 1-10 -p edge-tts[/dim]\n"
         "  [dim]book2audio convert --book-id abc123 -c 3,5,7[/dim]\n"
         "  [dim]book2audio convert book.pdf -p qwen3_mlx -l en-US[/dim]\n"
-        "  [dim]book2audio convert book.epub -p cosyvoice --model-path ~/models/cosyvoice2[/dim]",
+        "  [dim]book2audio convert book.epub -p kokoro -v zf_003[/dim]",
         title="convert",
         border_style="green",
     ))

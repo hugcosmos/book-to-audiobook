@@ -12,19 +12,23 @@ Convert ebooks (EPUB, MOBI, AZW3, PDF, TXT) to audiobooks (M4B / MP3) with chapt
 
 Create an isolated environment first to avoid dependency conflicts:
 
-**venv (Python 3.11+):**
+**venv:**
 
 ```bash
-python3.13 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 ```
 
 **conda:**
 
 ```bash
-conda create -n book2audio python=3.13 -y
+conda create -n book2audio python=3.12 -y
 conda activate book2audio
 ```
+
+> **Intel Mac users:** Kokoro (the default provider) needs Python ≤ 3.12 because
+> onnxruntime has no macOS x86 wheel for Python 3.13. Python 3.12 is recommended
+> across all platforms.
 
 Then choose one:
 

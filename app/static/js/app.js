@@ -84,6 +84,8 @@ async function loadDefaultSpeed() {
             speed = data.supertonic.speed;
         } else if (provider === 'cosyvoice' && data.cosyvoice && data.cosyvoice.speed != null) {
             speed = data.cosyvoice.speed;
+        } else if (provider === 'kokoro' && data.kokoro && data.kokoro.speed != null) {
+            speed = data.kokoro.speed;
         }
         var el = document.getElementById('speed');
         if (el) {

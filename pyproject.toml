@@ -77,15 +77,16 @@ cosyvoice = [
     "modelscope>=1.18.0",
     "huggingface-hub>=0.24.0",
 ]
-# Kokoro TTS — local ONNX/CPU, 82M model, 100 Chinese voices. Optional because
-# it pulls in onnxruntime (no wheel on Python 3.13 for macOS x86).
+# Kokoro TTS — local ONNX/CPU, 82M model, 100 Chinese voices. Optional for
+# non-Intel-Mac (it's default on Intel Mac). No onnxruntime wheel on macOS
+# x86 + Python 3.13, so this extra is excluded there.
 # Install with: pip install "book-to-audiobook[kokoro]"
 kokoro = [
-    "kokoro-onnx>=0.5.0",
-    "onnxruntime>=1.19.0",
-    "misaki>=0.9.0",
-    "pypinyin>=0.55.0",
-    "cn2an>=0.5.0",
+    "kokoro-onnx>=0.5.0; sys_platform != 'darwin' or platform_machine == 'arm64' or python_version < '3.13'",
+    "onnxruntime>=1.19.0; sys_platform != 'darwin' or platform_machine == 'arm64' or python_version < '3.13'",
+    "misaki>=0.9.0; sys_platform != 'darwin' or platform_machine == 'arm64' or python_version < '3.13'",
+    "pypinyin>=0.55.0; sys_platform != 'darwin' or platform_machine == 'arm64' or python_version < '3.13'",
+    "cn2an>=0.5.0; sys_platform != 'darwin' or platform_machine == 'arm64' or python_version < '3.13'",
 ]
 
 [project.urls]
