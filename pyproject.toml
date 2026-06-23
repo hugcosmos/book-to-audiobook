@@ -16,7 +16,6 @@ classifiers = [
     "Environment :: Console",
     "Environment :: Web Environment",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
@@ -45,9 +44,10 @@ dependencies = [
     # Default local TTS engine — mirrors config/settings.py.
     # Apple Silicon → Qwen3 MLX (GPU-accelerated).
     # Intel Mac → Kokoro (kokoro-onnx, ONNX/CPU, 100 Chinese voices).
+    #   kokoro-onnx is auto-installed on first use (its declared onnxruntime
+    #   requirement is overly strict for macOS x86_64).
     "mlx-audio>=0.1.0; platform_machine == 'arm64'",
     "hf-transfer>=0.1.9; platform_machine == 'arm64'",
-    "kokoro-onnx>=0.5.0; platform_machine != 'arm64' and python_version < '3.13'",
     "onnxruntime>=1.19.0; platform_machine != 'arm64' and python_version < '3.13'",
     "misaki>=0.9.0; platform_machine != 'arm64' and python_version < '3.13'",
     "pypinyin>=0.55.0; platform_machine != 'arm64' and python_version < '3.13'",
@@ -76,7 +76,8 @@ cosyvoice = [
 # Mac. On Apple Silicon, install with: pip install "book-to-audiobook[kokoro]"
 # Excluded on Python >= 3.13 (no onnxruntime wheel for macOS x86 then).
 kokoro = [
-    "kokoro-onnx>=0.5.0; python_version < '3.13'",
+    # kokoro-onnx is auto-installed on first use (see kokoro_tts.py);
+    # its declared onnxruntime>=1.20.1 conflicts with Python < 3.13 on macOS x86_64.
     "onnxruntime>=1.19.0; python_version < '3.13'",
     "misaki>=0.9.0; python_version < '3.13'",
     "pypinyin>=0.55.0; python_version < '3.13'",

@@ -69,13 +69,32 @@ def _ensure_model(model_dir: str | None = None) -> tuple[Path, Path]:
     return model_path, voices_path
 
 
+def _install_kokoro_onnx() -> None:
+    """Auto-install kokoro-onnx with --no-deps.
+
+    kokoro-onnx declares ``onnxruntime>=1.20.1`` on PyPI, but onnxruntime's
+    macOS x86_64 wheels stop at 1.19.2.  In practice 1.19.2 works fine, so we
+    bypass the resolver with --no-deps to avoid a spurious conflict.
+    """
+    import subprocess, sys
+    log.info("Installing kokoro-onnx (auto) ...")
+    subprocess.check_call(
+        [sys.executable, "-m", "pip", "install", "--no-deps", "kokoro-onnx"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+
+
 def _get_engine(model_dir_override: str | None = None):
     """Lazy-singleton: build kokoro-onnx Kokoro engine once."""
     global _kokoro_engine
     if _kokoro_engine is not None:
         return _kokoro_engine
 
-    from kokoro_onnx import Kokoro
+    try:
+        from kokoro_onnx import Kokoro
+    except ImportError:
+        _install_kokoro_onnx()
+        from kokoro_onnx import Kokoro
 
     model_path, voices_path = _ensure_model(model_dir_override)
     start = time.time()
@@ -111,11 +130,9 @@ class KokoroTTSProvider(BaseTTSProvider):
     def validate_config(cls, config: TTSConfig) -> None:
         try:
             from kokoro_onnx import Kokoro  # noqa: F401
-        except ImportError as e:
-            raise ValueError(
-                "Kokoro TTS requires 'kokoro-onnx'. "
-                "Install with: pip install kokoro-onnx"
-            ) from e
+        except ImportError:
+            _install_kokoro_onnx()
+            from kokoro_onnx import Kokoro  # noqa: F401
 
     @classmethod
     def warmup(cls) -> None:
