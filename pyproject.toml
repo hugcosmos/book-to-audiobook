@@ -47,11 +47,11 @@ dependencies = [
     # Intel Mac → Kokoro (kokoro-onnx, ONNX/CPU, 100 Chinese voices).
     "mlx-audio>=0.1.0; platform_machine == 'arm64'",
     "hf-transfer>=0.1.9; platform_machine == 'arm64'",
-    "kokoro-onnx>=0.5.0; platform_machine != 'arm64'",
-    "onnxruntime>=1.19.0; platform_machine != 'arm64'",
-    "misaki>=0.9.0; platform_machine != 'arm64'",
-    "pypinyin>=0.55.0; platform_machine != 'arm64'",
-    "cn2an>=0.5.0; platform_machine != 'arm64'",
+    "kokoro-onnx>=0.5.0; platform_machine != 'arm64' and python_version < '3.13'",
+    "onnxruntime>=1.19.0; platform_machine != 'arm64' and python_version < '3.13'",
+    "misaki>=0.9.0; platform_machine != 'arm64' and python_version < '3.13'",
+    "pypinyin>=0.55.0; platform_machine != 'arm64' and python_version < '3.13'",
+    "cn2an>=0.5.0; platform_machine != 'arm64' and python_version < '3.13'",
 ]
 
 [project.scripts]
@@ -62,14 +62,15 @@ book2audio = "cli.main:cli"
 # onnxruntime (a heavy native dep that lacks wheels on some Python versions,
 # e.g. 3.13). Install with: pip install "book-to-audiobook[supertonic]"
 supertonic = [
-    "supertonic>=1.3.0",
+    "supertonic>=1.3.0; python_version < '3.13'",
 ]
 # CosyVoice (sherpa-onnx, ONNX/CPU, multilingual). Not installed by default.
+# Needs Python < 3.13 (sherpa-onnx depends on onnxruntime, no macOS x86 wheel for 3.13).
 # Install with: pip install "book-to-audiobook[cosyvoice]"
 cosyvoice = [
-    "sherpa-onnx>=1.10.0",
-    "modelscope>=1.18.0",
-    "huggingface-hub>=0.24.0",
+    "sherpa-onnx>=1.10.0; python_version < '3.13'",
+    "modelscope>=1.18.0; python_version < '3.13'",
+    "huggingface-hub>=0.24.0; python_version < '3.13'",
 ]
 # Kokoro TTS (kokoro-onnx, ONNX/CPU, 100 Chinese voices). Default on Intel
 # Mac. On Apple Silicon, install with: pip install "book-to-audiobook[kokoro]"
