@@ -1,0 +1,58 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Weekly scan: Sunday 04:00 UTC
+    - cron: "0 4 * * 0"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  pip-audit:
+    name: pip-audit (dependency CVEs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit dependencies
+        # Drop --strict so low-severity / fix-not-available CVEs don't fail CI.
+        # -r: scan requirements.txt (keeps platform markers from pyproject)
+        run: pip-audit -r requirements.txt
+
+  gitleaks:
+    name: gitleaks (secret scan)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history needed to scan past commits on schedule/full runs
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          # Only required for private repos (uses GitHub API for sarif upload)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Optional: custom config. Create one if false positives appear.
+          # GITLEAKS_CONFIG: .gitleaks.toml
