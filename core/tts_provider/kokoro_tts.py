@@ -207,12 +207,17 @@ def _install_kokoro_onnx() -> None:
     required at runtime (Chinese phonemization), so install them explicitly.
     On arm64 these are NOT in the default deps (gated to x86_64), which is why
     the Settings UI install flow would otherwise leave kokoro unusable there.
+
+    English phonemization needs espeakng-loader + phonemizer-fork. These have
+    wheels for macOS x86_64/arm64, Linux x86_64/aarch64, and Windows, so they
+    are safe to add unconditionally across all supported hosts.
     """
     import subprocess, sys
     log.info("Installing kokoro-onnx + deps (auto) ...")
     subprocess.check_call(
         [sys.executable, "-m", "pip", "install", "--no-deps", "kokoro-onnx",
-         "onnxruntime", "misaki", "pypinyin", "cn2an"],
+         "onnxruntime", "misaki", "pypinyin", "cn2an",
+         "espeakng-loader", "phonemizer-fork"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
