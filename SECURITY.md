@@ -13,19 +13,22 @@ Only the latest release on the `main` branch receives security fixes.
 
 **Do NOT open a public GitHub issue for security vulnerabilities.**
 
-Instead, please report vulnerabilities privately:
+Instead, open a **draft security advisory** (GitHub's private vulnerability
+reporting channel):
 
-1. Go to the **Security** tab of this repository.
-2. Click **Report a vulnerability**.
-3. Fill in the advisory form with:
-   - Description of the issue
-   - Steps to reproduce
-   - Affected version / commit
-   - Suggested fix (if any)
+1. Go to the repository's **Security and quality** tab → **Security advisories**
+   section → **Open a draft security advisory**.
+   Direct link: <https://github.com/hugcosmos/book-to-audiobook/security/advisories/new>
+2. Fill in:
+   - **Title** — short summary of the issue
+   - **Description** — what the vulnerability is
+   - **Steps to reproduce** — minimal reproduction
+   - **Affected version / commit**
+   - **Suggested fix** (if any)
 
-You should receive a response within **7 days**. Reports are acknowledged
-before any fix is published, and credit is given in the release notes unless
-you prefer to remain anonymous.
+Draft advisories are private — only repository maintainers can see them
+until published. You should receive a response within **7 days**. Credit is
+given in the release notes unless you prefer to remain anonymous.
 
 ## Scope
 
