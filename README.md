@@ -67,6 +67,17 @@ book2audio convert book.epub -c 1-10     # convert chapters 1-10
 book2audio doc                            # full command reference
 ```
 
+### `serve` vs `start.sh`
+
+`book2audio serve` runs the server in the **foreground** with hot-reload — best for everyday use and development. To run it in the **background** (survives logout, logs to `.server.log`), use the helper scripts from the source checkout:
+
+```bash
+./start.sh     # background, reload off by default (B2A_RELOAD=1 to re-enable)
+./stop.sh      # stop the background server (also sets HF_HUB_ENABLE_HF_TRANSFER=1)
+```
+
+`start.sh` defaults to `python3`; set `PYTHON=/path/to/venv/bin/python` to pin an interpreter. These scripts are not shipped with the PyPI package — use `book2audio serve` there.
+
 ## CLI Reference
 
 Run `book2audio doc` for detailed help, or `book2audio <command> --help`.

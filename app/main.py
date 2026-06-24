@@ -99,11 +99,16 @@ async def index(request: Request):
 def main():
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     settings.output_dir.mkdir(parents=True, exist_ok=True)
+    # Reload is great for dev (edit → auto-restart) but wasteful for a long-
+    # running deployment. `book2audio serve` and bare `python -m app.main` keep
+    # reload on (dev default); start.sh sets B2A_RELOAD=0 to disable it.
+    import os
+    reload = os.environ.get("B2A_RELOAD", "1") not in ("0", "false", "False", "")
     uvicorn.run(
         "app.main:app",
         host=settings.host,
         port=settings.port,
-        reload=True,
+        reload=reload,
         reload_dirs=["app", "core", "config", "cli", "utils"],
     )
 
