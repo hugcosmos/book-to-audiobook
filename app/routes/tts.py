@@ -72,7 +72,7 @@ _PROVIDER_LABELS = {
     "iflytek": "科大讯飞语音合成",
     "elevenlabs": "ElevenLabs",
     "supertonic": "Supertonic (Local · 31 langs)",
-    "kokoro": "Kokoro TTS (本地 · ONNX · 中文)",
+    "kokoro": "Kokoro TTS (本地 · ONNX · 中/英)",
 }
 
 

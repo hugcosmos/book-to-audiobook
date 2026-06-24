@@ -146,12 +146,30 @@ VOICE_REGISTRY: dict[str, list[VoiceInfo]] = {
 
 
 def get_voices(provider: str, language: str | None = None) -> list[VoiceInfo]:
-    """Get available voices for a provider, optionally filtered by language prefix."""
+    """Get available voices for a provider, optionally filtered by language.
+
+    A voice is shown for a requested language when:
+      - it's ``multi`` (cross-language), or
+      - it carries a region tag (e.g. ``en-US``) AND matches the request exactly
+        (so en-US and en-GB voices don't bleed into each other), or
+      - it's a bare prefix (e.g. ``zh``, no region) and the request's prefix
+        matches (so a ``zh`` voice shows for both zh-CN and zh-TW).
+
+    Region-precise matching matters for providers like Kokoro, whose v1.1-zh
+    model has distinct en-US (af_maple/af_sol) and en-GB (bf_vale) voices —
+    the old prefix-only match listed all three regardless of the picked region.
+    """
     voices = VOICE_REGISTRY.get(provider, [])
-    if language:
-        prefix = language.split("-")[0].lower()
-        voices = [v for v in voices if v.language == "multi" or v.language.split("-")[0].lower() == prefix]
-    return voices
+    if not language:
+        return voices
+    req_prefix = language.split("-")[0].lower()
+    def matches(v: VoiceInfo) -> bool:
+        if v.language == "multi":
+            return True
+        if "-" in v.language:
+            return v.language.lower() == language.lower()  # region-exact
+        return v.language.split("-")[0].lower() == req_prefix  # bare-prefix
+    return [v for v in voices if matches(v)]
 
 
 def get_languages(provider: str) -> list[str]:

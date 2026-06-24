@@ -42,7 +42,7 @@ _PROVIDER_LABELS = {
     "elevenlabs": "ElevenLabs",
     "qwen3_mlx": "Qwen3 MLX",
     "supertonic": "Supertonic (Local · 31 langs)",
-    "kokoro": "Kokoro TTS (Local · ONNX · 中文)",
+    "kokoro": "Kokoro TTS (Local · ONNX · 中/英)",
 }
 
 # Maps settings section name to VOICE_REGISTRY provider key

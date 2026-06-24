@@ -161,9 +161,18 @@ async function loadLanguages() {
     var sel = document.getElementById('language');
     if (!sel || !_currentProvider) return;
     try {
+        // On first load the <select> is empty, so prevValue is "" — fall back
+        // to the user's configured default language from Settings rather than
+        // letting it land on the first option (which was always Chinese).
+        var prevValue = sel.value;
+        if (!prevValue) {
+            try {
+                var s = await fetch('/api/settings').then(function(r){return r.json();});
+                prevValue = s.tts_default_language || '';
+            } catch (e2) {}
+        }
         var resp = await fetch('/api/tts/languages?provider=' + encodeURIComponent(_currentProvider));
         var langs = await resp.json();
-        var prevValue = sel.value;
         sel.innerHTML = '';
         langs.forEach(function(l) {
             var opt = document.createElement('option');
@@ -171,8 +180,8 @@ async function loadLanguages() {
             opt.textContent = l.name;
             sel.appendChild(opt);
         });
-        // Try to keep previous selection if provider supports it
-        if (langs.some(function(l) { return l.code === prevValue; })) {
+        // Prefer the saved default (or prior selection) if this provider serves it
+        if (prevValue && langs.some(function(l) { return l.code === prevValue; })) {
             sel.value = prevValue;
         }
     } catch (e) {
