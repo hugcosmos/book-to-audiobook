@@ -76,7 +76,7 @@ book2audio doc                            # full command reference
 ./stop.sh      # stop the background server (also sets HF_HUB_ENABLE_HF_TRANSFER=1)
 ```
 
-`start.sh` defaults to `python3`; set `PYTHON=/path/to/venv/bin/python` to pin an interpreter. These scripts are not shipped with the PyPI package — use `book2audio serve` there.
+`start.sh` auto-detects an interpreter that has the project deps (checks the active venv/conda env, then `book2audio*` conda envs), since the default `python3` often lacks them. Pin one explicitly with `PYTHON=/path/to/venv/bin/python`. These scripts only exist in the source checkout — `pip install book-to-audiobook` doesn't ship them, so PyPI users use `book2audio serve`.
 
 ## CLI Reference
 
