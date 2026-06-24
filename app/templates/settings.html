@@ -17,15 +17,8 @@
                 <div class="settings-grid">
                     <div class="form-group">
                         <label>Default Provider</label>
-                        <select name="tts.provider" id="defaultProvider" class="settings-input" onchange="onDefaultProviderChange()">
-                            <option value="qwen3_mlx" {{ 'selected' if tts_default_provider == 'qwen3_mlx' }}>Qwen3 MLX</option>
-                            <option value="edge" {{ 'selected' if tts_default_provider == 'edge' }}>Edge TTS</option>
-                            <option value="baidu" {{ 'selected' if tts_default_provider == 'baidu' }}>Baidu</option>
-                            <option value="iflytek" {{ 'selected' if tts_default_provider == 'iflytek' }}>iFlytek</option>
-                            <option value="elevenlabs" {{ 'selected' if tts_default_provider == 'elevenlabs' }}>ElevenLabs</option>
-                            <option value="supertonic" {{ 'selected' if tts_default_provider == 'supertonic' }}>Supertonic (Local · 31 langs)</option>
-                            <option value="cosyvoice" {{ 'selected' if tts_default_provider == 'cosyvoice' }}>CosyVoice (Local · ONNX/CPU)</option>
-                            <option value="kokoro" {{ 'selected' if tts_default_provider == 'kokoro' }}>Kokoro TTS (Local · ONNX · 中文)</option>
+                        <select name="tts.provider" id="defaultProvider" class="settings-input" onchange="onDefaultProviderChange()" data-default="{{ tts_default_provider }}">
+                            <!-- populated dynamically by loadDefaultProviders() -->
                         </select>
                     </div>
                     <div class="form-group">
@@ -39,26 +32,16 @@
         </div>
 
         <!-- Provider-specific configs -->
-        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q', 'supertonic': 'S', 'cosyvoice': 'C', 'kokoro': 'K'} %}
+        {% set provider_icons = {'edge_tts': 'E', 'baidu_tts': 'B', 'iflytek_tts': 'i', 'elevenlabs': '11', 'qwen3_mlx': 'Q', 'supertonic': 'S', 'kokoro': 'K'} %}
         {% set field_labels = {'total_steps': 'Quality Steps', 'chunk_max_chars': 'Max Chars per Chunk', 'chunk_max_seconds': 'Max Chunk Duration', 'speed': 'Speed', 'model_name': 'Model Name', 'model_id': 'Model ID', 'app_id': 'App ID', 'api_key': 'API Key', 'secret_key': 'Secret Key', 'api_secret': 'API Secret', 'model_dir': 'Model Directory', 'num_threads': 'CPU Threads', 'download_source': 'Model Download Source'} %}
         {% for section, config in provider_configs.items() %}
-        <div class="settings-card" data-provider-section="{{ section }}">
+        <div class="settings-card" data-provider-section="{{ section }}" data-provider="{{ config.voice_provider }}">
             <div class="settings-card-header">
                 <div class="provider-icon icon-{{ section }}">{{ provider_icons.get(section, '?') }}</div>
                 <h2>{{ config.label }}</h2>
-                {% if section == 'edge_tts' %}
-                <span class="provider-badge badge-free">Free</span>
-                {% elif section == 'qwen3_mlx' %}
-                <span class="provider-badge badge-local">Local</span>
-                {% elif section == 'supertonic' %}
-                <span class="provider-badge badge-local">Local</span>
-                {% elif section == 'cosyvoice' %}
-                <span class="provider-badge badge-local">Local</span>
-                {% elif section == 'kokoro' %}
-                <span class="provider-badge badge-local">Local</span>
-                {% else %}
-                <span class="provider-badge badge-api">API Key Required</span>
-                {% endif %}
+                <!-- Status badge + install button populated by loadProviderStatus() -->
+                <span class="provider-badge" id="status-badge-{{ config.voice_provider }}">…</span>
+                <button type="button" class="btn-install" id="install-btn-{{ config.voice_provider }}" style="display:none" onclick="installProvider('{{ config.voice_provider }}')">Install</button>
                 <button type="button" class="btn-voice-toggle" onclick="toggleVoicePanel('{{ config.voice_provider }}')">Manage Voices</button>
             </div>
             <div class="settings-card-body">
@@ -91,7 +74,7 @@
                         {% elif 'num_threads' in field %}
                         <input type="number" name="{{ section }}.{{ field }}" value="{{ value }}" min="1" max="16" step="1" class="settings-input">
                         {% elif 'model_dir' in field %}
-                        <input type="text" name="{{ section }}.{{ field }}" value="{{ value }}" class="settings-input full-width" placeholder="{% if section == 'kokoro' %}Empty = auto-download to ~/.cache/book2audio/kokoro{% else %}Empty = auto-download to ~/.cache/book2audio/cosyvoice2{% endif %}">
+                        <input type="text" name="{{ section }}.{{ field }}" value="{{ value }}" class="settings-input full-width" placeholder="Empty = auto-download to ~/.cache/book2audio/kokoro">
                         {% elif 'download_source' in field %}
                         <select name="{{ section }}.{{ field }}" class="settings-input">
                             <option value="auto" {{ 'selected' if value == 'auto' or not value }}>Auto (ModelScope → HuggingFace)</option>
@@ -110,17 +93,23 @@
             <div class="voice-panel" id="voice-panel-{{ config.voice_provider }}" style="display:none;">
                 <div class="voice-panel-header">
                     <h3>Voice Library</h3>
+                    {% if section != 'supertonic' %}
                     <span class="voice-panel-hint">Built-in voices are read-only. Add custom voices below.</span>
+                    {% else %}
+                    <span class="voice-panel-hint">Supertonic ships 10 fixed voices — no custom voices supported.</span>
+                    {% endif %}
                 </div>
                 <div class="voice-lists">
                     <div class="voice-list-section">
                         <h4>Built-in Voices</h4>
                         <div class="voice-list" id="builtin-voices-{{ config.voice_provider }}">Loading...</div>
                     </div>
+                    {% if section != 'supertonic' %}
                     <div class="voice-list-section">
                         <h4>Custom Voices</h4>
                         <div class="voice-list" id="custom-voices-{{ config.voice_provider }}"></div>
                     </div>
+                    {% endif %}
                 </div>
                 {% if section == 'qwen3_mlx' %}
                 <!-- Voice cloning — Qwen3 MLX exclusive -->
@@ -161,9 +150,12 @@
                     </div>
                 </div>
                 {% endif %}
-                {% if section != 'qwen3_mlx' and section != 'supertonic' and section != 'cosyvoice' and section != 'kokoro' %}
+                {% if section != 'qwen3_mlx' and section != 'supertonic' %}
                 <div class="voice-add-form">
                     <h4>Add Custom Voice (manual)</h4>
+                    {% if section == 'kokoro' %}
+                    <p class="voice-add-hint">Kokoro voice IDs: Chinese <code>zf_001</code>–<code>zf_099</code> (female) / <code>zm_001</code>–<code>zm_099</code> (male); English <code>af_maple</code>, <code>af_sol</code>, <code>bf_vale</code>. The ID must exist in the loaded v1.1-zh model.</p>
+                    {% endif %}
                     <div class="voice-add-fields">
                         <input type="text" id="new-voice-id-{{ config.voice_provider }}" placeholder="Voice ID *" class="settings-input">
                         <input type="text" id="new-voice-name-{{ config.voice_provider }}" placeholder="Name *" class="settings-input">
@@ -191,7 +183,121 @@
 {% endblock %}
 {% block scripts %}
 <script>
-// --- Default TTS: dynamic language based on provider ---
+// --- Default TTS: dynamic provider list + language based on provider ---
+
+// Populate the provider dropdown from /api/tts/providers so both the settings
+// page and the convert page show the same configured/unavailable state.
+// Unavailable providers are disabled with the specific reason as the label,
+// instead of silently appearing selectable and failing at synth time.
+function loadDefaultProviders() {
+    var sel = document.getElementById('defaultProvider');
+    if (!sel) return;
+    var want = sel.dataset.default || '';
+    return fetch('/api/tts/providers')
+        .then(function(r) { return r.json(); })
+        .then(function(providers) {
+            sel.innerHTML = '';
+            // Ensure the user's configured default stays selectable even if its
+            // model isn't ready yet (e.g. first run before model download), so
+            // saving the setting doesn't silently switch away from it.
+            var haveOption = false;
+            providers.forEach(function(p) {
+                var opt = document.createElement('option');
+                opt.value = p.name;
+                opt.textContent = p.label + (p.configured ? '' : ' (' + (p.note || '未配置') + ')');
+                opt.disabled = !p.configured;
+                sel.appendChild(opt);
+                if (p.name === want) haveOption = true;
+            });
+            // Prefer the saved default; fall back to the first enabled option.
+            if (want && haveOption && !sel.querySelector('option[value="' + want + '"]').disabled) {
+                sel.value = want;
+            } else {
+                var firstEnabled = sel.querySelector('option:not([disabled])');
+                if (firstEnabled) sel.value = firstEnabled.value;
+            }
+            loadDefaultLanguages();
+            renderProviderStatus(providers);
+        })
+        .catch(function(e) { console.error('Failed to load providers:', e); });
+}
+
+// --- Provider status badges + install flow ---
+// Maps the live state from /api/tts/providers onto each settings card's badge
+// and Install button. A provider shows:
+//   Ready (green)        — usable now
+//   <reason> (grey)      — unconfigured but installable → shows Install button
+//   <reason> (dim grey)  — unavailable / needs manual setup (no button)
+//   安装中… (blue)       — install task running
+function renderProviderStatus(providers) {
+    providers.forEach(function(p) {
+        var badge = document.getElementById('status-badge-' + p.name);
+        var btn = document.getElementById('install-btn-' + p.name);
+        if (!badge) return;
+        badge.className = 'provider-badge';
+        if (p.status === 'installing') {
+            badge.classList.add('badge-installing');
+            badge.textContent = '安装中…';
+            if (btn) btn.style.display = 'none';
+            return;
+        }
+        if (p.configured) {
+            badge.classList.add('badge-ready');
+            badge.textContent = 'Ready';
+            if (btn) btn.style.display = 'none';
+        } else {
+            badge.classList.add(p.installable ? 'badge-unconfigured' : 'badge-unavailable');
+            badge.textContent = p.note || '未配置';
+            if (btn) btn.style.display = p.installable ? '' : 'none';
+        }
+    });
+}
+
+var _installPollTimers = {};
+function installProvider(provider) {
+    var btn = document.getElementById('install-btn-' + provider);
+    if (btn) btn.disabled = true;
+    fetch('/api/tts/install/' + encodeURIComponent(provider), { method: 'POST' })
+        .then(function(r) {
+            if (!r.ok) return r.json().then(function(d) { throw new Error(d.detail || 'Install failed'); });
+            return r.json();
+        })
+        .then(function(job) {
+            // Terminal already (e.g. provider was already configured)?
+            if (job.state === 'completed') { refreshProviderStatus(); return; }
+            pollInstall(provider);
+        })
+        .catch(function(e) {
+            alert('安装启动失败: ' + e.message);
+            if (btn) btn.disabled = false;
+        });
+}
+
+function pollInstall(provider) {
+    if (_installPollTimers[provider]) clearInterval(_installPollTimers[provider]);
+    _installPollTimers[provider] = setInterval(function() {
+        fetch('/api/tts/install/' + encodeURIComponent(provider) + '/status')
+            .then(function(r) { return r.json(); })
+            .then(function(job) {
+                if (job.state === 'installing' || job.state === 'pending') return;
+                clearInterval(_installPollTimers[provider]);
+                _installPollTimers[provider] = null;
+                if (job.state === 'failed') {
+                    alert('安装失败: ' + (job.error || '未知错误'));
+                }
+                refreshProviderStatus();
+            })
+            .catch(function() { /* keep polling */ });
+    }, 2000);
+}
+
+function refreshProviderStatus() {
+    fetch('/api/tts/providers')
+        .then(function(r) { return r.json(); })
+        .then(renderProviderStatus)
+        .catch(function() {});
+}
+
 function onDefaultProviderChange() {
     loadDefaultLanguages();
 }
@@ -218,7 +324,7 @@ function loadDefaultLanguages() {
 }
 
 // Load on page ready
-loadDefaultLanguages();
+loadDefaultProviders();
 
 function saveSettings(e) {
     e.preventDefault();
@@ -294,6 +400,7 @@ function renderBuiltinVoices(provider, voices) {
 
 function renderCustomVoices(provider, voices) {
     var el = document.getElementById('custom-voices-' + provider);
+    if (!el) return;  // provider has no custom-voice UI (e.g. supertonic)
     if (!voices.length) { el.innerHTML = '<span class="voice-empty">No custom voices yet</span>'; return; }
     el.innerHTML = voices.map(function(v) {
         return '<div class="voice-row voice-custom">' +

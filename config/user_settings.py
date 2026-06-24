@@ -109,8 +109,7 @@ def _rebuild_registry() -> None:
     """Rebuild VOICE_REGISTRY keeping only built-in voices."""
     from core.tts_provider.voices import (
         VOICE_REGISTRY, _QWEN3_VOICES, _EDGE_VOICES, _BAIDU_VOICES,
-        _IFLYTEK_VOICES, _ELEVENLABS_VOICES, _SUPERTONIC_VOICES, _COSYVOICE_VOICES,
-        _KOKORO_VOICES,
+        _IFLYTEK_VOICES, _ELEVENLABS_VOICES, _SUPERTONIC_VOICES, _KOKORO_VOICES,
     )
 
     VOICE_REGISTRY["qwen3_mlx"] = list(_QWEN3_VOICES)
@@ -119,7 +118,6 @@ def _rebuild_registry() -> None:
     VOICE_REGISTRY["iflytek"] = list(_IFLYTEK_VOICES)
     VOICE_REGISTRY["elevenlabs"] = list(_ELEVENLABS_VOICES)
     VOICE_REGISTRY["supertonic"] = list(_SUPERTONIC_VOICES)
-    VOICE_REGISTRY["cosyvoice"] = list(_COSYVOICE_VOICES)
     VOICE_REGISTRY["kokoro"] = list(_KOKORO_VOICES)
 
 
@@ -131,6 +129,14 @@ def get_custom_voices(provider: str) -> list[dict]:
 
 def add_custom_voice(provider: str, voice: dict) -> None:
     """Add a custom voice and persist."""
+    # Kokoro voice ids are model-defined: Chinese z* (zf_xxx female / zm_xxx
+    # male, 3 digits) and a handful of named English ids. We can't enumerate
+    # all valid ids without loading the ~380MB model, so validate the *format*
+    # here and reject obviously-wrong ids early (conversion-time failure from
+    # kokoro-onnx is otherwise opaque). Format match still doesn't guarantee
+    # the id exists in the loaded model — see voices.py for the known set.
+    if provider == "kokoro":
+        _validate_kokoro_voice_id(voice.get("id", ""))
     data = get_user_settings_dict()
     data.setdefault("custom_voices", {})
     data["custom_voices"].setdefault(provider, [])
@@ -156,6 +162,32 @@ def delete_custom_voice(provider: str, voice_id: str) -> None:
     voices = data.get("custom_voices", {}).get(provider, [])
     data["custom_voices"][provider] = [v for v in voices if v["id"] != voice_id]
     save_user_settings(data)
+
+
+def _validate_kokoro_voice_id(voice_id: str) -> None:
+    """Validate a Kokoro custom voice id by format (not model membership).
+
+    The v1.1-zh model exposes voice ids like:
+      - Chinese: zf_001..zf_099 (female), zm_001..zm_099 (male) — 3 digits
+      - English: af_maple, af_sol (US), bf_vale (UK) — named
+
+    Format match does NOT prove the id exists in the loaded model; a
+    well-formed-but-absent id still fails at synthesis time. This just rejects
+    obviously-wrong ids early so the user gets a clear 400 instead of an opaque
+    kokoro-onnx error minutes later during conversion.
+    """
+    import re
+    vid = (voice_id or "").strip().lower()
+    # Chinese z* pattern or the 3 named English ids shipped by v1.1-zh.
+    _ZH_RE = re.compile(r"^(zf|zm)_\d{3}$")
+    _EN_IDS = {"af_maple", "af_sol", "bf_vale"}
+    if _ZH_RE.match(vid) or vid in _EN_IDS:
+        return
+    raise ValueError(
+        "Invalid Kokoro voice id. Expected a Chinese id like 'zf_001' or "
+        "'zm_012' (3 digits), or one of the English ids: af_maple, af_sol, "
+        "bf_vale. The id must exist in the loaded model."
+    )
 
 
 def get_hidden_voices(provider: str) -> list[str]:

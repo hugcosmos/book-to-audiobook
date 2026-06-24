@@ -197,16 +197,22 @@ def _ensure_model(model_dir: str | None = None) -> tuple[Path, Path]:
 
 
 def _install_kokoro_onnx() -> None:
-    """Auto-install kokoro-onnx with --no-deps.
+    """Auto-install kokoro-onnx (with --no-deps) plus its runtime deps.
 
     kokoro-onnx declares ``onnxruntime>=1.20.1`` on PyPI, but onnxruntime's
-    macOS x86_64 wheels stop at 1.19.2.  In practice 1.19.2 works fine, so we
+    macOS x86_64 wheels stop at 1.19.2. In practice 1.19.2 works fine, so we
     bypass the resolver with --no-deps to avoid a spurious conflict.
+
+    kokoro-onnx also pulls in misaki/pypinyin/cn2an via its deps; those are
+    required at runtime (Chinese phonemization), so install them explicitly.
+    On arm64 these are NOT in the default deps (gated to x86_64), which is why
+    the Settings UI install flow would otherwise leave kokoro unusable there.
     """
     import subprocess, sys
-    log.info("Installing kokoro-onnx (auto) ...")
+    log.info("Installing kokoro-onnx + deps (auto) ...")
     subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "--no-deps", "kokoro-onnx"],
+        [sys.executable, "-m", "pip", "install", "--no-deps", "kokoro-onnx",
+         "onnxruntime", "misaki", "pypinyin", "cn2an"],
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )
 
@@ -248,10 +254,13 @@ def _phonemize_zh(text: str) -> str:
 
 class KokoroTTSProvider(BaseTTSProvider):
     provider_name = "kokoro"
-    supported_languages = [
-        "zh-CN", "zh-TW", "zh-HK",
-        "en-US", "en-GB",
-    ]
+    # v1.1-zh model: 100 Chinese + 3 English voices (af_maple/af_sol/bf_vale),
+    # all registered in voices.py. Chinese uses misaki phonemization; English
+    # goes through kokoro-onnx's espeak pipeline.
+    # Only zh-CN is offered: the model has no Traditional/Cantonese variants
+    # (misaki's zh g2p is Simplified-Mandarin only), so zh-TW/zh-HK would just
+    # route to the same Simplified pipeline and mislead the user.
+    supported_languages = ["zh-CN", "en-US", "en-GB"]
 
     def __init__(self, config: TTSConfig) -> None:
         super().__init__(config)

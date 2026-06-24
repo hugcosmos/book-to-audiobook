@@ -101,8 +101,6 @@ async def start_convert(book_id: str, body: ConvertBody, force: int = Query(0)):
             effective_speed = settings.qwen3_mlx.speed
         elif provider == "supertonic":
             effective_speed = settings.supertonic.speed
-        elif provider == "cosyvoice":
-            effective_speed = settings.cosyvoice.speed
         elif provider == "kokoro":
             effective_speed = settings.kokoro.speed
         else:

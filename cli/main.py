@@ -154,7 +154,7 @@ Examples:
   book2audio convert book.epub -p kokoro -v zf_003""")
 @click.argument("input_file", required=False, type=click.Path(exists=True))
 @click.option("--chapters", "-c", default=None, help="Chapter range (e.g., '1-5,7,10-')")
-@click.option("--provider", "-p", default=None, help="TTS provider: edge, elevenlabs, baidu, iflytek, qwen3_mlx, supertonic, cosyvoice, kokoro")
+@click.option("--provider", "-p", default=None, help="TTS provider: edge, elevenlabs, baidu, iflytek, qwen3_mlx, supertonic, kokoro")
 @click.option("--voice", "-v", default=None, help="Voice name (see 'book2audio doc')")
 @click.option("--language", "-l", default="zh-CN", help="Language code (zh-CN, en-US, ja-JP, etc.)")
 @click.option("--speed", "-s", type=float, default=None, help="Speech speed (0.5-2.0, default: 1.0)")
@@ -208,8 +208,6 @@ def convert(input_file, chapters, provider, voice, language, speed, model_path, 
             speed = settings.qwen3_mlx.speed
         elif effective_provider == "supertonic":
             speed = settings.supertonic.speed
-        elif effective_provider == "cosyvoice":
-            speed = settings.cosyvoice.speed
         elif effective_provider == "kokoro":
             speed = settings.kokoro.speed
         else:
@@ -651,7 +649,7 @@ def doc():
         "  -v, --voice NAME       Voice name\n"
         "  -l, --language CODE    Language (zh-CN, en-US, ja-JP, etc.)\n"
         "  -s, --speed FLOAT      Speed 0.5-2.0 (default: 1.0)\n"
-        "      --model-path PATH  Local model path (qwen3_mlx / cosyvoice / kokoro)\n"
+        "      --model-path PATH  Local model path (qwen3_mlx / kokoro)\n"
         "      --book-id ID       Use existing library book\n\n"
         "[bold]Examples:[/bold]\n"
         "  [dim]book2audio convert book.epub[/dim]\n"
@@ -748,8 +746,7 @@ def doc():
         "  [bold]edge[/bold]           Free, good quality. Microsoft Edge voices.\n"
         "  [bold]qwen3_mlx[/bold]      Local, Apple Silicon optimized. Needs mlx-audio.\n"
         "  [bold]kokoro[/bold]         Local, ONNX/CPU (kokoro-onnx). 100+ CN voices. Intel Mac default.\n"
-        "  [bold]supertonic[/bold]     Local, ONNX-based, 33 languages. Needs supertonic.\n"
-        "  [bold]cosyvoice[/bold]     Local, ONNX/CPU (sherpa-onnx). Optional. Needs sherpa-onnx.\n"
+        "  [bold]supertonic[/bold]     Local, ONNX-based, 31 languages. Needs supertonic.\n"
         "  [bold]baidu[/bold]          Baidu API. Requires app_id + api_key.\n"
         "  [bold]iflytek[/bold]        iFlytek API. Requires app_id + api_key + api_secret.\n"
         "  [bold]elevenlabs[/bold]     ElevenLabs API. Requires api_key.\n\n"

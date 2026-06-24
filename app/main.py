@@ -36,8 +36,6 @@ load_user_settings()
 
 # Eagerly preload the default local TTS model in background (non-blocking).
 # qwen3_mlx: always warm up (model is local, fast on Apple Silicon).
-# cosyvoice: only warm up if the model is already on disk — never trigger a
-# multi-hundred-MB download at startup; the first synthesis downloads on demand.
 def _preload_tts_model():
     import threading
     from utils.log import log
@@ -53,17 +51,6 @@ def _preload_tts_model():
             Qwen3MLXTTSProvider._worker_started = True
             t = threading.Thread(target=Qwen3MLXTTSProvider._worker_loop, daemon=True)
             t.start()
-        elif provider == "cosyvoice":
-            from core.tts_provider.cosyvoice_tts import _resolve_model_dir, _find_onnx
-            model_dir = _resolve_model_dir()
-            # Only preload if model already downloaded; don't fetch at startup.
-            if (model_dir / "tokens.txt").exists() and _find_onnx(model_dir).exists():
-                from core.tts_provider.cosyvoice_tts import CosyVoiceTTSProvider
-                log.info("Preloading CosyVoice model in background (non-blocking)...")
-                t = threading.Thread(target=CosyVoiceTTSProvider.warmup, daemon=True)
-                t.start()
-            else:
-                log.info("CosyVoice model not yet downloaded — will fetch on first synthesis")
         elif provider == "kokoro":
             # Kokoro needs onnxruntime; skip on Python 3.13 (no macOS x86 wheel).
             try:

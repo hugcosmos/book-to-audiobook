@@ -82,8 +82,6 @@ async function loadDefaultSpeed() {
             speed = data.qwen3_mlx.speed;
         } else if (provider === 'supertonic' && data.supertonic && data.supertonic.speed != null) {
             speed = data.supertonic.speed;
-        } else if (provider === 'cosyvoice' && data.cosyvoice && data.cosyvoice.speed != null) {
-            speed = data.cosyvoice.speed;
         } else if (provider === 'kokoro' && data.kokoro && data.kokoro.speed != null) {
             speed = data.kokoro.speed;
         }
@@ -128,7 +126,9 @@ async function loadProviders() {
         _providers.forEach(function(p) {
             var opt = document.createElement('option');
             opt.value = p.name;
-            opt.textContent = p.label + (p.configured ? '' : ' (未配置)');
+            // When not configured, show the specific reason (missing model,
+            // missing API key, etc.) instead of a generic "未配置".
+            opt.textContent = p.label + (p.configured ? '' : ' (' + (p.note || '未配置') + ')');
             opt.disabled = !p.configured;
             sel.appendChild(opt);
         });

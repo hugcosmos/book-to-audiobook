@@ -52,8 +52,7 @@ automatically. Cloud providers (Edge/Baidu/iFlytek/ElevenLabs) only need API key
 
 ### Optional local providers
 
-- **Supertonic** (ONNX, 33 languages): `pip install "book-to-audiobook[supertonic]"`
-- **CosyVoice** (sherpa-onnx, ONNX/CPU, multilingual): `pip install "book-to-audiobook[cosyvoice]"`
+- **Supertonic** (ONNX, 31 languages): `pip install "book-to-audiobook[supertonic]"`
 - **Kokoro on Apple Silicon**: `pip install "book-to-audiobook[kokoro]"`
 
 ## Quick Start
@@ -154,38 +153,25 @@ pip install "book-to-audiobook[supertonic]"
 # or directly: pip install supertonic
 ```
 
-10 built-in voices (5 male, 5 female). Supports English, Japanese, Korean, Arabic, German, French, Spanish, Russian, and 24 more languages.
-
-### Local — CosyVoice (ONNX / CPU, via sherpa-onnx)
-
-Optional local provider. On-device, multilingual (zh / en / ja / ko), no API key. Runs on CPU through [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx).
-
-```bash
-pip install "book-to-audiobook[cosyvoice]"
-# or directly: pip install sherpa-onnx huggingface-hub
-```
-
-The quantized ONNX model (~0.6–1.2 GB) is downloaded automatically on first use. **ModelScope is tried first** (CosyVoice is Alibaba's; ModelScope is fastest in mainland China), with a HuggingFace fallback. Files land in `~/.cache/book2audio/cosyvoice2` (override with `B2A_COSYVOICE__MODEL_DIR`). To force a source: `B2A_COSYVOICE__DOWNLOAD_SOURCE=modelscope|auto` (or set `modelscope_repo`/`huggingface_repo` to pin a mirror). 4 preset voices (Chinese/English, male/female).
-
-> Performance note: inference is CPU-bound. Expect a real-time factor around 0.3–1.5× (one minute of audio in ~0.3–1.5 minutes), depending on your CPU and `num_threads`. The first synthesis also pays a one-time model-load cost (~10–30s). Tune `B2A_COSYVOICE__NUM_THREADS` (default 2) and `B2A_COSYVOICE__CHUNK_MAX_CHARS` (default 120) to balance speed vs. system responsiveness.
+10 built-in voices (5 male, 5 female). Supports English, Japanese, Korean, Arabic, German, French, Spanish, Russian, and 22 more languages.
 
 ## Supported Languages
 
 Availability depends on provider:
 
-| Language | Edge | Qwen3 MLX | ElevenLabs | Supertonic | CosyVoice | Kokoro | Baidu | iFlytek |
-|----------|------|-----------|------------|------------|-----------|--------|-------|---------|
-| Chinese (zh-CN) | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ | ✓ |
-| English (en-US) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
-| Japanese | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — |
-| Korean | ✓ | ✓ | ✓ | ✓ | ✓ | — | — | — |
-| French | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
-| German | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
-| Spanish | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
-| Russian | ✓ | ✓ | ✓ | ✓ | — | — | — | — |
-| Portuguese | — | ✓ | ✓ | ✓ | — | — | — | — |
-| Italian | — | ✓ | ✓ | ✓ | — | — | — | — |
-| + 23 more | — | — | — | ✓ | — | — | — | — |
+| Language | Edge | Qwen3 MLX | ElevenLabs | Supertonic | Kokoro | Baidu | iFlytek |
+|----------|------|-----------|------------|------------|--------|-------|---------|
+| Chinese (zh-CN) | ✓ | ✓ | ✓ | — | ✓ | ✓ | ✓ |
+| English (en-US) | ✓ | ✓ | ✓ | ✓ | ✓ | — | — |
+| Japanese | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| Korean | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| French | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| German | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| Spanish | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| Russian | ✓ | ✓ | ✓ | ✓ | — | — | — |
+| Portuguese | — | ✓ | ✓ | ✓ | — | — | — |
+| Italian | — | ✓ | ✓ | ✓ | — | — | — |
+| + 22 more | — | — | — | ✓ | — | — | — |
 
 ## Configuration
 
@@ -219,7 +205,7 @@ output/            # Generated audiobook files
 
 **Edge TTS**: This project includes [edge-tts](https://github.com/rany2/edge-tts) as one TTS provider, which connects to Microsoft Edge's online text-to-speech service. This is not an official Microsoft API and may violate Microsoft's Terms of Service.
 
-Users can choose alternative providers (Kokoro, Qwen3 MLX, CosyVoice, Supertonic, ElevenLabs, Baidu, iFlytek) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
+Users can choose alternative providers (Kokoro, Qwen3 MLX, Supertonic, ElevenLabs, Baidu, iFlytek) to avoid Edge TTS. Use at your own risk — the authors are not responsible for any violations of third-party terms of service.
 
 ## License
 

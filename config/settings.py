@@ -92,25 +92,6 @@ class SupertonicSettings(BaseModel):
     chunk_max_chars: int = 300 # matches supertonic's default
 
 
-class CosyVoiceSettings(BaseModel):
-    """CosyVoice TTS via sherpa-onnx — local ONNX/CPU runtime.
-
-    CosyVoice2 is exported to a quantized ONNX model and run on CPU through
-    sherpa-onnx. Optional on macOS; install via [cosyvoice] extras.
-    """
-
-    model_dir: str | None = None       # None → auto-download to ~/.cache/book2audio/cosyvoice2
-    num_threads: int = 2               # CPU threads for inference (leave cores for the system)
-    chunk_max_chars: int = 120         # per-chunk char cap; short on CPU to bound latency
-    speed: float = 1.0                 # speech speed multiplier
-    # Where to fetch the ONNX model on first use. "auto" tries ModelScope first
-    # (CosyVoice is Alibaba's; ModelScope is its home registry and fastest in
-    # mainland China), falling back to HuggingFace if ModelScope is unavailable.
-    download_source: str = "auto"      # auto | modelscope | huggingface
-    modelscope_repo: str = "pengzhendong/cosyvoice2-0.5B-int8"
-    huggingface_repo: str = "k2-fsa/sherpa-onnx-cosyvoice2-0.5B-int8"
-
-
 class KokoroSettings(BaseModel):
     """Kokoro TTS via kokoro-onnx — local ONNX/CPU runtime, 82M model.
 
@@ -149,7 +130,6 @@ class Settings(BaseSettings):
     elevenlabs: ElevenLabsSettings = ElevenLabsSettings()
     qwen3_mlx: Qwen3MLXSettings = Qwen3MLXSettings()
     supertonic: SupertonicSettings = SupertonicSettings()
-    cosyvoice: CosyVoiceSettings = CosyVoiceSettings()
     kokoro: KokoroSettings = KokoroSettings()
     audio: AudioSettings = AudioSettings()
 

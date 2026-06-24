@@ -111,18 +111,10 @@ _ELEVENLABS_VOICES = [
 ]
 
 
-# --- CosyVoice (sherpa-onnx, local CPU) ---
-# CosyVoice2 preset speakers; id is the string form of the sid passed to
-# sherpa_onnx.OfflineTts.generate(text, sid, speed). Multilingual model.
-_COSYVOICE_VOICES = [
-    VoiceInfo("0", "中文女声", VoiceGender.FEMALE, "multi", "cosyvoice", "CosyVoice2 预置 · 中文女声"),
-    VoiceInfo("1", "中文男声", VoiceGender.MALE, "multi", "cosyvoice", "CosyVoice2 预置 · 中文男声"),
-    VoiceInfo("2", "英文女声", VoiceGender.FEMALE, "multi", "cosyvoice", "CosyVoice2 预置 · 英文女声"),
-    VoiceInfo("3", "英文男声", VoiceGender.MALE, "multi", "cosyvoice", "CosyVoice2 预置 · 英文男声"),
-]
-
-
 # --- Kokoro TTS (kokoro-onnx, local CPU, v1.1-zh model) ---
+# v1.1-zh ships 100 Chinese (z*) + 3 English (af_maple/af_sol American,
+# bf_vale British) voices. We register a Chinese subset plus all 3 English
+# voices so the model is usable for both languages offline.
 _KOKORO_VOICES = [
     VoiceInfo("zf_003", "Kokoro 女声 003", VoiceGender.FEMALE, "zh", "kokoro"),
     VoiceInfo("zf_024", "Kokoro 女声 024", VoiceGender.FEMALE, "zh", "kokoro"),
@@ -136,6 +128,9 @@ _KOKORO_VOICES = [
     VoiceInfo("zm_069", "Kokoro 男声 069", VoiceGender.MALE, "zh", "kokoro"),
     VoiceInfo("zm_089", "Kokoro 男声 089", VoiceGender.MALE, "zh", "kokoro"),
     VoiceInfo("zm_098", "Kokoro 男声 098", VoiceGender.MALE, "zh", "kokoro"),
+    VoiceInfo("af_maple", "Maple", VoiceGender.FEMALE, "en-US", "kokoro", "American female"),
+    VoiceInfo("af_sol", "Sol", VoiceGender.FEMALE, "en-US", "kokoro", "American female"),
+    VoiceInfo("bf_vale", "Vale", VoiceGender.FEMALE, "en-GB", "kokoro", "British female"),
 ]
 
 
@@ -146,7 +141,6 @@ VOICE_REGISTRY: dict[str, list[VoiceInfo]] = {
     "iflytek": _IFLYTEK_VOICES,
     "elevenlabs": _ELEVENLABS_VOICES,
     "supertonic": _SUPERTONIC_VOICES,
-    "cosyvoice": _COSYVOICE_VOICES,
     "kokoro": _KOKORO_VOICES,
 }
 
@@ -158,3 +152,36 @@ def get_voices(provider: str, language: str | None = None) -> list[VoiceInfo]:
         prefix = language.split("-")[0].lower()
         voices = [v for v in voices if v.language == "multi" or v.language.split("-")[0].lower() == prefix]
     return voices
+
+
+def get_languages(provider: str) -> list[str]:
+    """Languages a provider can actually serve — derived from registered voices.
+
+    This is the source of truth for the language dropdown. A language appears
+    only if the provider has a voice for it (a ``multi`` voice covers every
+    language the provider declares in ``supported_languages``; a specific voice
+    covers its own language). This guarantees the UI never offers a language
+    with no selectable voice — the root cause of "unsupported language" bugs.
+    """
+    from importlib import import_module
+    from core.tts_provider.tts_factory import _PROVIDER_MAP
+
+    voices = VOICE_REGISTRY.get(provider, [])
+    has_multi = any(v.language == "multi" for v in voices)
+    # Specific languages covered by a non-multi voice.
+    covered = {v.language for v in voices if v.language != "multi"}
+
+    # Resolve the provider's declared languages to know what "multi" expands to.
+    declared: list[str] = []
+    if provider in _PROVIDER_MAP:
+        mod_path, cls_name = _PROVIDER_MAP[provider]
+        declared = getattr(import_module(mod_path), cls_name).supported_languages
+
+    result: list[str] = []
+    for lang in declared:
+        prefix = lang.split("-")[0].lower()
+        if lang in covered or prefix in {c.split("-")[0].lower() for c in covered}:
+            result.append(lang)            # has a specific voice
+        elif has_multi:
+            result.append(lang)            # covered by a multi voice
+    return result

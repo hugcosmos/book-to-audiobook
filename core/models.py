@@ -76,6 +76,18 @@ class ConversionStatus(BaseModel):
     output_files: list[OutputFile] = Field(default_factory=list)
 
 
+class InstallStatus(BaseModel):
+    """State of a TTS provider model/package install triggered from the UI.
+
+    Mirrors the ConversionStatus pattern: an in-memory registry keyed by
+    provider name, polled by the frontend until a terminal state is reached.
+    """
+    provider: str
+    state: str = "pending"  # pending | installing | completed | failed
+    message: str = ""
+    error: str | None = None
+
+
 class ConversionManifest(BaseModel):
     book_id: str
     selected_chapters: list[int]
