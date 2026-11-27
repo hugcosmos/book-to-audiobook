@@ -2,6 +2,8 @@
 
 Convert ebooks (EPUB, MOBI, AZW3, PDF, TXT) to audiobooks (M4B / MP3) with chapter markers.
 
+Why it is built this way — the four constraints behind this tool: **[English](https://hugcosmos.github.io/blog/en/convert-whole-books-to-audiobooks)** · **[中文](https://hugcosmos.github.io/blog/zh/convert-whole-books-to-audiobooks)**
+
 ## Prerequisites
 
 - Python >= 3.11
